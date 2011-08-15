@@ -1,0 +1,37 @@
+- bNotifyOldLink is confusing -> change to bOvr
+  -> done partiallly
+
+- remove pgidDep
+  -> done partiallly
+
+- Leaf::update may invoke doSplit but may cause no split 
+  - update from large val -> small val fragments leaf
+  - this fragmentation is invisible from sizeFree
+  - doSplit when there is space left
+  POSSIBLE FIX: allow doSplit without split
+
+  -> fixed / but no test
+
+- DupKeyLeaf::curUpdate impl.
+
+known issues list:
+
+VERY CRITICAL
+- PartitionedPageIO needs to be made thread safe
+- DupKey-tree compaction is not implemented! (may result in record-loss)
+
+CRITICAL
+- version number may exceed 64-bit
+- pgid may exceed 64-bit
+- handle part id > PTNK_MAX_PARTID
+
+FIXLATER
+- remove x86_64 dependency
+- remove gcc dependency
+- make mmap optional
+
+PERFORMANCE ISSUES
+- PartitionedPageIO impl. is very inefficient (especially PartitionedPageIO::readPage)
+
+NO TEST
+- add test for compaction (check no record loss)

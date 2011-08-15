@@ -1,0 +1,15 @@
+Ptnk includes userspace DTrace probes.
+
+* Supported envs.
+Currently only tested on Mac OSX 10.6.7
+
+* Usage
+./waf configure build_rel --with-dtrace
+
+sudo dtrace -s ptnk.d -c "build/rel/ptnk_bench --sleep hoge"
+
+* Known bugs
+DTrace (at least on osx) can't detect probes immediately after program launch.
+Make sure that probes are detected before doing measurement.
+
+The ptnk_bench program has "--sleep" option to ensure this.

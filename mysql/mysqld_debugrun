@@ -1,0 +1,12 @@
+#!/bin/bash
+(cd ..; ./waf build_rel) || exit
+../waf clean build install || exit
+
+. ./mysqld_vars
+
+trap 'killall mysqld; exit' 2 3 9 15
+
+mysqld --datadir=$MYVAR --basedir=$SHARE --lc-messages-dir=$SHARE --socket=$SOCKET --pid=$PIDFILE -#d:t:F 2>&1 | tee mysqld.log | grep ptnk &
+sleep 3
+mysql -u root -S $SOCKET
+killall mysqld

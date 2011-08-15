@@ -1,0 +1,17 @@
+DOXYFILE_ENCODING      = UTF-8
+PROJECT_NAME           = ptnk
+PROJECT_NUMBER         =
+PROJECT_BRIEF          =
+PROJECT_LOGO           =
+CREATE_SUBDIRS         = NO
+OUTPUT_LANGUAGE        = English
+TAB_SIZE               = 4
+BUILTIN_STL_SUPPORT    = YES
+INLINE_GROUPED_CLASSES = YES
+EXTRACT_LOCAL_CLASSES  = YES
+HIDE_UNDOC_CLASSES     = NO
+GENERATE_LATEX         = NO
+HTML_OUTPUT            = doxy
+RECURSIVE              = YES
+EXCLUDE	               = ptnk_test.cpp bench.h bench_tmpl.h
+EXCLUDE_PATTERNS       = .waf*

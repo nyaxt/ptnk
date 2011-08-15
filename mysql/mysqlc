@@ -1,0 +1,7 @@
+#!/bin/bash
+. ./mysqld_vars
+
+if pgrep -x mysqld
+then
+	mysql -uroot -S$SOCKET $@
+fi

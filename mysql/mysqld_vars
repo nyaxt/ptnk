@@ -1,0 +1,7 @@
+SRCDIR=/usr/src/mysql
+BASEDIR=/usr/local
+SHARE=$BASEDIR/mysql/share
+MYVAR=/home/kouhei/work/myvar
+SOCKET=$MYVAR/socket
+PIDFILE=$MYVAR/pid
+

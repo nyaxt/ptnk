@@ -1,0 +1,35 @@
+--------------------------------------------------------------------------------
+* Compaction strategy memo
+
+We actually do NOT implement garbage collection literally. However, a compaction mechanism is provided so that user can discard old logs safely.
+
+In the compaction process, we need to care "ancient pages," which are pages located before certain point in the log, but still being referenced from the active snapshot. Compaction can be safely done by making copy of those ancient pages to the log tip, and by redirecting references to them.
+
+This is done by performing a full scan of the table, and making list of ancient pages found during scan. 
+
+** 1. naive impl.
+
+start new tx
+
+A = []
+traverse pages -> p:
+  if (p.log_position < threshold):
+    A << p
+
+foreach p in A:
+  write p -> p' as override page
+
+tx commit!:
+  foreach p in A:
+    if conflicted (p.ovr already exist)
+      skip p enable
+    else:
+      enable p
+      remove p from A
+
+end tx
+
+note: leafs are always older than nodes
+- nodes are always updated by rebase ops
+
+move tx may partially fail safely

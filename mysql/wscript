@@ -1,0 +1,56 @@
+VERSION='0.0.1'
+APPNAME='myptnk'
+
+top = '.'
+out = 'build'
+
+import Utils
+from waflib import Build
+
+def options(opt):
+	opt.load('compiler_cxx boost')
+	opt.add_option('--mysql-srcdir', action='store', default='/usr/src/mysql', dest='mysql_srcdir')
+	opt.add_option('--mysql-basedir', action='store', default='/usr/local/mysql', dest='mysql_basedir')
+
+def configure(conf):
+	conf.env.append_unique('CXXFLAGS', ['-g', '--fast-math', '-Werror', '-fno-implicit-templates', '-fno-exceptions', '-fno-rtti', '-felide-constructors', '-DUNIV_MUST_NOT_INLINE', '-DEXTRA_DEBUG', '-DFORCE_INIT_OF_VARS', '-DSAFE_MUTEX', '-fPIC'])
+	conf.env.append_unique('LINKFLAGS', ['-fno-exceptions', '-fno-rtti'])
+	conf.env.append_unique('INCLUDES', ['/home/kouhei/local/include', '/usr/local/include', '/home/kouhei/ptnk'])
+	conf.env.append_unique('LIBPATH', ['/home/kouhei/local/lib', '/usr/local/lib', '/home/kouhei/ptnk/build/rel'])
+
+	conf.load('compiler_cxx boost')
+
+	# mysql 
+	print("\n* MySQL conf")
+	print('-> mysql_srcdir: %r' % conf.options.mysql_srcdir)
+	print('-> mysql_basedir: %r' % conf.options.mysql_basedir)
+
+	mysql_srcdir = conf.env.mysql_srcdir = conf.options.mysql_srcdir
+	mysql_basedir = conf.env.mysql_basedir = conf.options.mysql_basedir
+	conf.env.append_unique('INCLUDES', [mysql_srcdir+'/include', mysql_srcdir+'/sql', mysql_basedir+'/include'])
+	conf.env.append_unique('LIBPATH', [mysql_basedir+'/lib'])
+	conf.check_cxx(uselib_store='MYSQL', header_name='my_global.h', mandatory=True)
+	conf.check_cxx(uselib_store='MYSQL', header_name='sql_priv.h', mandatory=True)
+	conf.check_cxx(uselib_store='MYSQL_SERV', lib='mysqlservices', mandatory=True)
+
+	# boost
+	conf.check_boost(uselib_store='BOOST_THREAD', lib='thread', mt=True)
+
+	# ptnk
+	conf.check_cxx(uselib_store='PTNK', lib='ptnk')
+
+def build(bld):
+	b = bld.shlib(
+		target = 'ha_myptnk.so',
+		install_path = bld.env.mysql_basedir+'/share/lib/plugin',
+
+		use = 'MYSQL MYSQL_SERV PTNK BOOST_THREAD',
+		linkflags = '-module',
+		defines = ['MYSQL_DYNAMIC_PLUGIN'],
+
+		source = 'ha_myptnk.cpp'
+		)
+	b.env['cxxshlib_PATTERN'] = '%s' # get lid of lib hogehoge .so
+
+def test(ctx):
+	pass

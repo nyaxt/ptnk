@@ -1,0 +1,8 @@
+probe ptnk_btree_get_start = process("ptnk_bench").mark("btree_get_start")
+{
+	probestr = "btree_get_start"
+}
+
+probe ptnk* {
+	printf("ptnk_probe: %s\n", probestr);
+}
