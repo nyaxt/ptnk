@@ -151,6 +151,12 @@ public:
 		return m_p;
 	}
 
+	enum
+	{
+		INVALID_TAG = -1,
+		NULL_TAG = -2,	
+	};
+
 	ssize_t size() const
 	{
 		return m_size;
@@ -221,12 +227,6 @@ public:
 	static const BufferCRef INVALID_VAL;
 
 private:
-	enum
-	{
-		INVALID_TAG = -1,
-		NULL_TAG = -2,	
-	};
-
 	const char* m_p;
 	ssize_t m_size;
 };

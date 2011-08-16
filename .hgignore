@@ -27,3 +27,6 @@ core$
 ^doxy/
 ^mysql/mysqld.log$
 ^benchresult
+^rubyext/Makefile$
+mkmf\.log$
+rubyext/ptnk\.so$

@@ -11,6 +11,7 @@ namespace ptnk {
 typedef uint64_t page_id_t;
 
 #endif
+#undef P_
 #ifdef PTNK_ADD_PREFIX
 #define P_(x) PTNK_##x
 #else
