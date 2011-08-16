@@ -450,7 +450,7 @@ TPIO::handleStreak(BufferCRef bufStreak)
 #define PTNK_BKWD_SCAN(pio) \
 	page_id_t pgid = pio->getLastPgId(); \
 	for(part_id_t partid = PGID_PARTID(pgid); partid != PTNK_PARTID_INVALID; -- partid) \
-	for(local_pgid_t pgidL = pio->getPartLastLocalPgId(partid); pgidL != PTNK_LOCALID_INVALID; -- pgidL, pgid = PGID_PARTLOCAL(partid, pgidL))
+	for(pgid = PGID_PARTLOCAL(partid, pio->getPartLastLocalPgId(partid)); PGID_LOCALID(pgid) != PGID_LOCALID_MASK; -- pgid)
 
 void
 TPIO::restoreState()
@@ -465,6 +465,8 @@ TPIO::restoreState()
 	m_stateTip.pgidStartPage = PGID_INVALID;
 	PTNK_BKWD_SCAN(m_backend)
 	{
+		// std::cerr << "restorestate scan: " << pgid2str(pgid) << " partid: " << partid << std::endl;
+
 		Page pg(m_backend->readPage(pgid));
 		page_hdr_t::flags_t flags = pg.hdr()->flags;
 		tx_id_t ver = pg.hdr()->txid;
