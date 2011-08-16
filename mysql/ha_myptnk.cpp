@@ -463,6 +463,43 @@ ha_myptnk::write_row(uchar *buf)
 		DBUG_RETURN(HA_ERR_INTERNAL_ERROR);
 	}
 
+	if(table->s->keys == 0)
+	{
+		// table w/ no key
+
+		size_t bufsize = calc_packed_rowsize(buf);
+		uchar* bufValue = reinterpret_cast<uchar*>(::malloc(bufsize));
+		uchar* p = bufValue;
+		DEBUG_OUTF("write_row alloced buf %lu\n", bufsize);
+
+		// copy bitmap for null fields (null_bytes)
+		::memcpy(p, buf, table->s->null_bytes);
+		p += table->s->null_bytes;
+
+		// pack each field
+		const int nfields = table->s->fields;
+		for(int i = 0; i < nfields; ++ i)
+		{
+			Field* field = table->field[i];	
+			
+			p = field->pack(p, buf + field->offset(buf));
+		}
+		DEBUG_OUTF("real row size: %lu\n", p - bufValue);
+
+		ptnk_datum_t value_data = {(char*)bufValue, p - bufValue};
+		DEBUG_OUTF("new value dump %02x %02x %02x %02x %02x\n", bufValue[0], bufValue[1], bufValue[2], bufValue[3], bufValue[4]);
+		static ptnk_datum_t null_key = {NULL, 0};
+		if(! ptnk_tx_table_put(m_txn->ptnktx, m_ptnktable, null_key, value_data, PTNK_PUT_INSERT))
+		{
+			DEBUG_OUTF("ptnk_tx_put has failed");
+			rc = HA_ERR_INTERNAL_ERROR;	
+		}
+
+		::free(bufValue);
+
+		DBUG_RETURN(rc);
+	}
+
 	// pack key
 	DEBUG_OUTF("num keys: %d, key_parts: %d\n", table->s->keys, table->s->key_parts);
 	DEBUG_OUTF("primary key idx: %d\n", table->s->primary_key);
