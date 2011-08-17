@@ -5,15 +5,22 @@ top = '.'
 out = 'build'
 
 import Utils
-from waflib import Build
+from waflib import Build, Options
 
 def options(opt):
 	opt.load('compiler_cxx boost')
 	opt.add_option('--mysql-srcdir', action='store', default='/usr/src/mysql', dest='mysql_srcdir')
 	opt.add_option('--mysql-basedir', action='store', default='/usr/local/mysql', dest='mysql_basedir')
+	opt.add_option('--debug', action='store_true', default=False, help='enable debug logging/etc. (super slow)', dest='debug')
 
 def configure(conf):
-	conf.env.append_unique('CXXFLAGS', ['-g', '--fast-math', '-Werror', '-fno-implicit-templates', '-fno-exceptions', '-fno-rtti', '-felide-constructors', '-DUNIV_MUST_NOT_INLINE', '-DEXTRA_DEBUG', '-DFORCE_INIT_OF_VARS', '-DSAFE_MUTEX', '-fPIC'])
+	conf.env.append_unique('CXXFLAGS', ['-g', '--fast-math', '-Werror', '-fno-implicit-templates', '-fno-exceptions', '-fno-rtti', '-felide-constructors', '-fPIC'])
+
+	if Options.options.debug:
+		conf.env.append_unique('CXXFLAGS', ['-DUNIV_MUST_NOT_INLINE', '-DEXTRA_DEBUG', '-DFORCE_INIT_OF_VARS', '-DSAFE_MUTEX', '-DMYPTNK_DEBUG'])
+	else:
+		conf.env.append_unique('CXXFLAGS', ['-DDBUG_OFF'])
+
 	conf.env.append_unique('LINKFLAGS', ['-fno-exceptions', '-fno-rtti'])
 	conf.env.append_unique('INCLUDES', ['/home/kouhei/local/include', '/usr/local/include', '/home/kouhei/ptnk'])
 	conf.env.append_unique('LIBPATH', ['/home/kouhei/local/lib', '/usr/local/lib', '/home/kouhei/ptnk/build/rel'])

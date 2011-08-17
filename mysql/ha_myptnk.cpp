@@ -7,8 +7,15 @@
 #include <iostream>
 #include <string>
 
+// #define MYPTNK_DEBUG
+
+#ifdef MYPTNK_DEBUG
 #define DEBUG_OUTF(...) do { fprintf(stdout, "ha_myptnk: " __VA_ARGS__); fflush(stdout);} while (0)
 #define WARN_STUB do { DEBUG_OUTF("%p STUB FUNCTION %s called!\n", this, __FUNCTION__); } while (0)
+#else
+#define DEBUG_OUTF(...) 
+#define WARN_STUB
+#endif
 
 #include "sql_priv.h"
 #include "sql_class.h"
@@ -276,6 +283,8 @@ ha_myptnk::calc_packed_rowsize(uchar* buf)
 void
 ha_myptnk::copy_table_name(const char* name)
 {
+	DEBUG_OUTF("copy_table_name: name: %s, m_table_name: %s\n", name, m_table_name);
+
 	if(m_table_name)
 	{
 		::free(m_table_name);	
@@ -286,6 +295,7 @@ ha_myptnk::copy_table_name(const char* name)
 
 	// copy table name
 	size_t len_name = ::strlen(name);
+	DEBUG_OUTF("len_name: %u\n", len_name);
 	const char* table_name = "default";
 	for(int i = 0; i < len_name; ++ i)
 	{
@@ -296,6 +306,7 @@ ha_myptnk::copy_table_name(const char* name)
 		}
 	}
 
+	DEBUG_OUTF("table_name: %s\n", table_name);
 	m_table_name = (char*)::malloc(::strlen(table_name) + 1);
 	::strcpy(m_table_name, table_name);
 

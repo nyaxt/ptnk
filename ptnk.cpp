@@ -4,7 +4,7 @@
 #include <fcntl.h>
 
 #define PTNK_READ_BUF_SIZE 4096
-#define PTNK_LOG_ALL_CAPI
+// #define PTNK_LOG_ALL_CAPI
 
 #ifdef PTNK_LOG_ALL_CAPI
 #include <stdio.h>
