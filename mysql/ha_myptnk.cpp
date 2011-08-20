@@ -52,6 +52,39 @@ private:
 	pthread_mutex_t m_impl;
 };
 
+struct myptnk_txn
+{
+	ptnk_tx_t* ptnktx;
+	bool readonly;
+	int count;
+
+	myptnk_txn(ptnk_db_t* ptnkdb, bool readonly_)
+	:	ptnktx(::ptnk_tx_begin(ptnkdb)),
+		readonly(readonly_),
+		count(1)
+	{
+		/* NOP */	
+	}
+
+	~myptnk_txn()
+	{
+		if(ptnktx)
+		{
+			::ptnk_tx_end(ptnktx, PTNK_TX_ABORT);	
+		}
+	}
+
+	void incCount()
+	{
+		++ count;	
+	}
+
+	bool decCount()
+	{
+		return (--count == 0);
+	}
+};
+
 // static myptnk_share_map_t g_myptnk_open_tables;
 static mutex_wrap g_myptnk_giant_mtx;
 
@@ -64,9 +97,35 @@ static
 int
 myptnk_commit(handlerton* hton, THD *thd, bool all)
 {
+	int errcode = 0;
+
 	DEBUG_OUTF("myptnk_commit. thd: %p all: %d\n", thd, all);
 
-	return 0;
+	myptnk_txn* txn = static_cast<myptnk_txn*>(thd_get_ha_data(thd, hton));
+	if(! txn)
+	{
+		// no on-going txn
+		return 0;	
+	}
+
+	if(! txn->readonly)
+	{
+		// not read-only txn...
+		
+		// try committing changes
+		if(! ::ptnk_tx_end(txn->ptnktx, PTNK_TX_COMMIT))
+		{
+			errcode = HA_ERR_RECORD_CHANGED;	
+		}
+		txn->ptnktx = NULL;
+	}
+
+	delete txn;
+
+	txn = NULL;
+	thd_set_ha_data(thd, hton, txn);
+
+	return errcode;
 }
 
 static
@@ -74,6 +133,19 @@ int
 myptnk_rollback(handlerton* hton, THD* thd, bool all)
 {
 	DEBUG_OUTF("myptnk_rollback. thd: %p all: %d\n", thd, all);
+
+	myptnk_txn* txn = static_cast<myptnk_txn*>(thd_get_ha_data(thd, hton));
+	if(! txn)
+	{
+		// no on-going txn
+		return 0;	
+	}
+
+	// don't perform commit
+	delete txn;
+
+	txn = NULL;
+	thd_set_ha_data(thd, hton, txn);
 
 	return 0;
 }
@@ -217,39 +289,6 @@ free_share(myptnk_share* table)
 
 	return 0;
 }
-
-struct myptnk_txn
-{
-	ptnk_tx_t* ptnktx;
-	bool readonly;
-	int count;
-
-	myptnk_txn(ptnk_db_t* ptnkdb, bool readonly_)
-	:	ptnktx(::ptnk_tx_begin(ptnkdb)),
-		readonly(readonly_),
-		count(1)
-	{
-		/* NOP */	
-	}
-
-	~myptnk_txn()
-	{
-		if(ptnktx)
-		{
-			::ptnk_tx_end(ptnktx, PTNK_TX_ABORT);	
-		}
-	}
-
-	void incCount()
-	{
-		++ count;	
-	}
-
-	bool decCount()
-	{
-		return (--count == 0);
-	}
-};
 
 ha_myptnk::ha_myptnk(handlerton *hton, TABLE_SHARE *table_arg)
 :	handler(hton, table_arg),
@@ -1208,6 +1247,29 @@ ha_myptnk::truncate()
 }
 
 int
+ha_myptnk::start_stmt(THD *thd, thr_lock_type lock_type)
+{
+	DBUG_ENTER("ha_myptnk::start_stmt");
+
+	switch(lock_type)
+	{
+	case F_RDLCK:
+		DEBUG_OUTF("start_stmt F_RDLCK\n");
+		break;
+
+	case F_WRLCK:
+		DEBUG_OUTF("start_stmt F_WRLCK\n");
+		break;
+
+	case F_UNLCK:
+		DEBUG_OUTF("start_stmt F_UNLCK\n");
+		break;
+	}
+	
+	DBUG_RETURN(0);
+}
+
+int
 ha_myptnk::external_lock(THD *thd, int lock_type)
 {
 	DBUG_ENTER("ha_myptnk::external_lock");
@@ -1231,16 +1293,26 @@ ha_myptnk::external_lock(THD *thd, int lock_type)
 
 	myptnk_txn* txn = static_cast<myptnk_txn*>(thd_get_ha_data(thd, ht));
 
+	if(thd_test_options(thd, OPTION_NOT_AUTOCOMMIT)) DEBUG_OUTF("non autocommit mode\n");
+	if(thd_test_options(thd, OPTION_BEGIN)) DEBUG_OUTF("thd begin txn\n");
+
+	bool acmode = ! thd_test_options(thd, OPTION_BEGIN | OPTION_NOT_AUTOCOMMIT);
+
 	if(lock_type != F_UNLCK)
 	{
 		if(! txn)
 		{
 			txn = new myptnk_txn(m_table_share->ptnkdb, lock_type == F_RDLCK);
 			thd_set_ha_data(thd, ht, txn);
+			trans_register_ha(thd, acmode ? FALSE : TRUE, ht);
 		}
 		else
 		{
 			txn->incCount();
+			if(txn->readonly && (lock_type == F_WRLCK))
+			{
+				txn->readonly = false;	
+			}
 		}
 	}
 	else
@@ -1251,28 +1323,15 @@ ha_myptnk::external_lock(THD *thd, int lock_type)
 		}
 		else
 		{
-			if(txn->decCount())
+			if(acmode && txn->decCount())
 			{
-				if(! txn->readonly)
-				{
-					// not read-only txn...
-					
-					// try committing changes
-					if(! ::ptnk_tx_end(txn->ptnktx, PTNK_TX_COMMIT))
-					{
-						errcode = HA_ERR_RECORD_CHANGED;	
-					}
-				}
-
-				txn = NULL;
-				thd_set_ha_data(thd, ht, txn);
-				delete txn;
+				errcode = myptnk_commit(ht, thd, true);
 			}
 		}
 	}
 
 	m_txn = txn;
-	DBUG_RETURN(0);
+	DBUG_RETURN(errcode);
 }
 
 #define STORE_LOCK_STUB(op) \
