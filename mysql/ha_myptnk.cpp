@@ -395,12 +395,6 @@ ha_myptnk::close(void)
 
 	if(m_cur) rnd_end();
 
-	if(m_txn)
-	{
-		m_txn->decCount();
-		m_txn = NULL;
-	}
-
 	if(m_ptnktable)
 	{
 		::ptnk_table_close(m_ptnktable);
@@ -1326,6 +1320,7 @@ ha_myptnk::external_lock(THD *thd, int lock_type)
 			if(acmode && txn->decCount())
 			{
 				errcode = myptnk_commit(ht, thd, true);
+				txn = NULL;
 			}
 		}
 	}
