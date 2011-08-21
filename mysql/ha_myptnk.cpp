@@ -217,7 +217,6 @@ struct myptnk_share
 
 	void dbfilepath(char* path)
 	{
-		char path[512];
 		snprintf(path, sizeof path, "%s/%s", dbname, dbname);
 
 		DEBUG_OUTF("path: %s\n", path);
@@ -1417,6 +1416,7 @@ ha_myptnk::delete_table(const char *name)
 
 	if(bDropDB)
 	{
+		DEBUG_OUTF("no tables left -> deleting db file\n");
 		rc = m_table_share->dropdb();	
 	}
 

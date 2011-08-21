@@ -158,11 +158,11 @@ try
 
 	ptnk::DB::drop(file);
 
-	return 0;
+	return 1;
 }
 catch(...)
 {
-	return 1;
+	return 0;
 }
 
 int
