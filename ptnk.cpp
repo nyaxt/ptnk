@@ -151,6 +151,21 @@ ptnk_close(ptnk_db_t* db)
 }
 
 int
+ptnk_drop_db(const char* file)
+try
+{
+	LOG_OUTF("ptnk_drop_db(file = %s);\n", file);
+
+	ptnk::DB::drop(file);
+
+	return 0;
+}
+catch(...)
+{
+	return 1;
+}
+
+int
 ptnk_put(ptnk_db_t* db, ptnk_datum_t key, ptnk_datum_t value, int mode)
 try
 {
@@ -583,3 +598,25 @@ try
 	return 1;
 }
 COMMON_CATCH_BLOCKS(tx)
+
+const char*
+ptnk_tx_table_get_name_cstr(ptnk_tx_t* tx, int idx)
+{
+	LOG_OUTF("ptnk_tx_table_get_name_cstr(tx = %p, idx = %d);\n", tx, idx);
+
+	tx->impl->tableGetName(idx, &tx->read_buf);
+	tx->read_buf.makeNullTerm();
+
+	if(tx->read_buf.valsize() >= 0)
+	{
+		tx->read_buf.makeNullTerm();
+
+		LOG_OUTF("ptnk_tx_table_get_name_cstr ret: %s\n", tx->read_buf.get());
+		return tx->read_buf.get();
+	}
+	else
+	{
+		LOG_OUTF("ptnk_tx_table_get_name_cstr ret: (NULL)\n");
+		return NULL;
+	}
+}

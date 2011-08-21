@@ -215,6 +215,14 @@ struct myptnk_share
 		thr_lock_delete(&mysql_lock);
 	}
 
+	void dbfilepath(char* path)
+	{
+		char path[512];
+		snprintf(path, sizeof path, "%s/%s", dbname, dbname);
+
+		DEBUG_OUTF("path: %s\n", path);
+	}
+
 	int open(int mode)
 	{
 		if(ptnkdb)
@@ -223,15 +231,24 @@ struct myptnk_share
 			return 0;
 		}
 
-		char path[512];
-		snprintf(path, sizeof path, "%s/%s", dbname, dbname);
-
-		DEBUG_OUTF("path: %s\n", path);
+		char path[512]; dbfilepath(path);
 
 		if(! (ptnkdb = ::ptnk_open(path, PTNK_OWRITER | PTNK_OCREATE | PTNK_OAUTOSYNC | PTNK_OPARTITIONED, 0644)))
 		{
 			return ER_CANT_OPEN_FILE;
 		}
+	}
+
+	int dropdb()
+	{
+		char path[512]; dbfilepath(path);
+		
+		if(! ::ptnk_drop_db(path))
+		{
+			return ER_CANT_OPEN_FILE;
+		}
+
+		return 0;
 	}
 };
 
@@ -1373,19 +1390,15 @@ ha_myptnk::delete_table(const char *name)
 	ptnk_tx_t* tx = ::ptnk_tx_begin(db);
 
 	// drop table for secondary keys
-	#if 0
-	// FIXME FIXME table ptr seems to be invalid here.
-	for(int i = 1; i < table->s->keys; ++ i)
+	for(int i = 1 ;; ++ i)
 	{
 		char idx_table_name[1024];
 		sprintf(idx_table_name, "%s/%d", m_table_name, i);
 		if(! ::ptnk_tx_table_drop_cstr(tx, idx_table_name))
 		{
-			DEBUG_OUTF("failed to drop table (secondary idx): %s\n", idx_table_name);
-			rc = HA_ERR_INTERNAL_ERROR;
+			break;
 		}
 	}
-	#endif
 
 	if(! ::ptnk_tx_table_drop_cstr(tx, m_table_name))
 	{
@@ -1393,17 +1406,22 @@ ha_myptnk::delete_table(const char *name)
 		rc = HA_ERR_INTERNAL_ERROR;
 	}
 
+	// drop db if table other than the default table (idx 0) doesn't exist
+	bool bDropDB = (! ::ptnk_tx_table_get_name_cstr(tx, 1));
+
 	if(! ::ptnk_tx_end(tx, PTNK_TX_COMMIT))
 	{
 		DEBUG_OUTF("failed to commit delete table txn\n");
 		rc = HA_ERR_LOCK_DEADLOCK;	
 	}
 
-	if(m_table_share)
+	if(bDropDB)
 	{
-		free_share(m_table_share);
-		m_table_share = NULL;
+		rc = m_table_share->dropdb();	
 	}
+
+	free_share(m_table_share);
+	m_table_share = NULL;
 
 	DBUG_RETURN(rc);
 }

@@ -23,7 +23,7 @@ PartitionedPageIO::PartitionedPageIO(const char* dbprefix, ptnk_opts_t opts, int
 	PTNK_ASSERT(dbprefix != NULL && *dbprefix != '\0');
 	m_dbprefix = dbprefix;
 	
-	scanFiles();
+	openFiles();
 
 	if(!(opts & OWRITER))
 	{
@@ -59,6 +59,18 @@ PartitionedPageIO::PartitionedPageIO(const char* dbprefix, ptnk_opts_t opts, int
 PartitionedPageIO::~PartitionedPageIO()
 {
 	/* NOP */
+}
+
+void
+PartitionedPageIO::drop(const char* dbprefix)
+{
+	Vpartfile_t files; scanFiles(&files, dbprefix);
+
+	std::string filepath; part_id_t _;
+	BOOST_FOREACH(boost::tie(filepath, _), files)
+	{
+		PTNK_ASSURE_SYSCALL(::unlink(filepath.c_str()));
+	}
 }
 
 void
@@ -109,23 +121,22 @@ checkperm(const char* filepath, int flags)
 } // end of anonymous namespace
 
 void
-PartitionedPageIO::scanFiles()
+PartitionedPageIO::scanFiles(Vpartfile_t* files, const char* dbprefix)
 {
-	// extract dir path from m_dbprefix
+	// extract dir path from dbprefix
 	char bufdir[4096]; bufdir[4095] = '\0';
-	::strncpy(bufdir, m_dbprefix.c_str(), sizeof(bufdir)-1);
+	::strncpy(bufdir, dbprefix, sizeof(bufdir)-1);
 	const char* pathdir = ::dirname(bufdir);
 
-	// extract dbname from m_dbprefix
+	// extract dbname from dbprefix
 	char bufbase[4096]; bufbase[4095] = '\0';
-	::strncpy(bufbase, m_dbprefix.c_str(), sizeof(bufbase)-1);
+	::strncpy(bufbase, dbprefix, sizeof(bufbase)-1);
 	const char* dbname = ::basename(bufbase);
 	
 	// scan _pathdir_
 	DIR* dir;
 	PTNK_ASSURE_SYSCALL(dir = ::opendir(pathdir));
 
-	m_partidFirst = PTNK_PARTID_MAX;
 	struct dirent* entry;
 	while((entry = ::readdir(dir)) != NULL)
 	{
@@ -182,6 +193,21 @@ PartitionedPageIO::scanFiles()
 		if(partid > PTNK_PARTID_MAX) continue;
 
 		// std::cout << "dbfile found: " << filepath << " part_id: " << partid << std::endl;
+		files->push_back(make_pair(filepath, partid));
+	}
+
+	::closedir(dir);
+}
+
+void
+PartitionedPageIO::openFiles()
+{
+	Vpartfile_t files; scanFiles(&files, m_dbprefix.c_str());
+
+	m_partidFirst = PTNK_PARTID_MAX;
+	std::string filepath; part_id_t partid;
+	BOOST_FOREACH(boost::tie(filepath, partid), files)
+	{
 		if(m_opts & OTRUNCATE)
 		{
 			std::cout << "  O_TRUNCATE has been specified. deleting: " << filepath << std::endl;
@@ -211,8 +237,6 @@ PartitionedPageIO::scanFiles()
 			}
 		}
 	}
-
-	::closedir(dir);
 }
 
 PartitionedPageIO::Partition*

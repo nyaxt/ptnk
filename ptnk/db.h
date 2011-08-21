@@ -26,6 +26,8 @@ public:
 
 	~DB();
 
+	static void drop(const char* filename);
+
 	ssize_t get(BufferCRef key, BufferRef value);
 	void get(BufferCRef key, Buffer* value)
 	{

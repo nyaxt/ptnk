@@ -2,6 +2,12 @@
 
 #include <stdio.h>
 
+// vvv for file_exists
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <fcntl.h>
+// ^^^ for file_exists
+
 #include <boost/tuple/tuple.hpp>
 
 #include "pageiomem.h"
@@ -31,6 +37,49 @@ DB::DB(const boost::shared_ptr<PageIO>& pio)
 {
 	m_pio = pio;
 	initCommon();
+}
+
+namespace 
+{
+
+bool
+file_exists(const char* filename)
+{
+	int fd = ::open(filename, O_RDONLY);
+	if(fd >= 0)
+	{
+		::close(fd);
+		return true;
+	}
+	else
+	{
+		if(errno == ENOENT)
+		{
+			return false;
+		}
+		else
+		{
+			throw ptnk_syscall_error(__FILE__, __LINE__, "open", errno);	
+		}
+	}
+}
+
+} // end of anonymous namespace
+
+void
+DB::drop(const char* filename)
+{
+	if(!filename || *filename == '\0') return;
+	
+	if(file_exists(filename))
+	{
+		PTNK_ASSURE_SYSCALL(::unlink(filename));
+	}
+	else
+	{
+		// check for partitioned db files
+		PartitionedPageIO::drop(filename);
+	}
 }
 
 void

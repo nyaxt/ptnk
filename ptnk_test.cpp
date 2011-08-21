@@ -4166,3 +4166,58 @@ TEST(ptnk, ptnk_capi_delete_all_records)
 
 	::ptnk_close(db);
 }
+
+TEST(ptnk, db_drop)
+{
+	t_mktmpdir("./_testtmp");
+	const char* TGTFILE = "./_testtmp/hoge.ptnk";
+
+	// create dummy file
+	{
+		int f = ::open(TGTFILE, O_RDWR | O_CREAT, 0644);
+		ASSERT_LE(0, f);
+		
+		::close(f);
+	}
+
+	{
+		struct stat s;
+		ASSERT_EQ(0, ::stat(TGTFILE, &s));
+	}
+
+	DB::drop(TGTFILE);
+
+	{
+		struct stat s;
+		ASSERT_GT(0, ::stat(TGTFILE, &s));
+		ASSERT_EQ(ENOENT, errno);
+	}
+}
+
+TEST(ptnk, db_drop_partitioned)
+{
+	t_mktmpdir("./_testtmp");
+
+	const char* TGTFILE = "./_testtmp/hoge.003.ptnk";
+
+	// create dummy file
+	{
+		int f = ::open(TGTFILE, O_RDWR | O_CREAT, 0644);
+		ASSERT_LE(0, f);
+		
+		::close(f);
+	}
+
+	{
+		struct stat s;
+		ASSERT_EQ(0, ::stat(TGTFILE, &s));
+	}
+
+	DB::drop("./_testtmp/hoge");
+
+	{
+		struct stat s;
+		ASSERT_GT(0, ::stat(TGTFILE, &s));
+		ASSERT_EQ(ENOENT, errno);
+	}
+}

@@ -21,6 +21,15 @@ public:
 
 	~PartitionedPageIO();
 
+	typedef pair<std::string, part_id_t> partfile_t;
+	typedef std::vector<partfile_t> Vpartfile_t;
+
+	//! scan for partitioned db files
+	static void scanFiles(Vpartfile_t* files, const char* dbprefix);
+
+	//! delete all db files for _dbprefix_
+	static void drop(const char* dbprefix);
+
 	page_id_t alignCompactionThreshold(page_id_t threshold) const;
 
 	// ====== implements PageIO interface ======
@@ -112,8 +121,8 @@ private:
 	};
 	typedef boost::ptr_vector<Partition> VPPartition;
 
-	//! scan directory for partitioned db files and populate m_parts
-	void scanFiles();
+	//! open partitioned db files and populate m_parts
+	void openFiles();
 
 	//! add new partition
 	Partition* addNewPartition();

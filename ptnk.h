@@ -61,6 +61,14 @@ ptnk_db_t* ptnk_open_dbm(const char* file, int flags, int mode);
  */
 void ptnk_close(ptnk_db_t* db);
 
+/*! delete (unlink) db files */
+/*!
+ *	@param[in] file		path to db file
+ *	
+ *	@return non-zero on success
+ */
+int ptnk_drop_db(const char* file);
+
 /*! insert new / update existing record */
 /*! 
  *  @param[in] db		opened db handle
@@ -350,6 +358,16 @@ int ptnk_tx_table_drop(ptnk_tx_t* tx, ptnk_datum_t table);
  *	@return non-zero on success
  */
 int ptnk_tx_table_drop_cstr(ptnk_tx_t* tx, const char* table);
+
+/*! return table identifier of index _idx_ in null-terminated string */
+/*!
+ *  @param [in] tx		opened transaction handle
+ *  @param [in] idx		index of table
+ *
+ *	@return
+ *		table identifier in null-terminated string. The result is stored in internal buffer in _tx_
+ */
+const char* ptnk_tx_table_get_name_cstr(ptnk_tx_t* tx, int idx);
 
 #ifdef PTNK_NDBM_COMPAT
 /* source code compatibility w/ ndbm */
