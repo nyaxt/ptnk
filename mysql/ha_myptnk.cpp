@@ -190,6 +190,7 @@ struct myptnk_share
 {
 	int useCount;
 	char* dbname;
+	char dbfilepath[512];
 	THR_LOCK mysql_lock;
 	mutex_wrap mtx;
 
@@ -201,6 +202,7 @@ struct myptnk_share
 		ptnkdb(NULL)
 	{
 		thr_lock_init(&mysql_lock);
+		snprintf(dbfilepath, sizeof dbfilepath, "%s/%s", dbname, dbname);
 	}
 
 	~myptnk_share()
@@ -215,13 +217,6 @@ struct myptnk_share
 		thr_lock_delete(&mysql_lock);
 	}
 
-	void dbfilepath(char* path)
-	{
-		snprintf(path, sizeof path, "%s/%s", dbname, dbname);
-
-		DEBUG_OUTF("path: %s\n", path);
-	}
-
 	int open(int mode)
 	{
 		if(ptnkdb)
@@ -230,9 +225,7 @@ struct myptnk_share
 			return 0;
 		}
 
-		char path[512]; dbfilepath(path);
-
-		if(! (ptnkdb = ::ptnk_open(path, PTNK_OWRITER | PTNK_OCREATE | PTNK_OAUTOSYNC | PTNK_OPARTITIONED, 0644)))
+		if(! (ptnkdb = ::ptnk_open(dbfilepath, PTNK_OWRITER | PTNK_OCREATE | PTNK_OAUTOSYNC | PTNK_OPARTITIONED, 0644)))
 		{
 			return ER_CANT_OPEN_FILE;
 		}
@@ -240,9 +233,7 @@ struct myptnk_share
 
 	int dropdb()
 	{
-		char path[512]; dbfilepath(path);
-		
-		if(! ::ptnk_drop_db(path))
+		if(! ::ptnk_drop_db(dbfilepath))
 		{
 			return ER_CANT_OPEN_FILE;
 		}

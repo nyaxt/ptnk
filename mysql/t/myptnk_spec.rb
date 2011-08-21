@@ -17,7 +17,7 @@ describe "MyPTNK" do
 
     qf "install plugin myptnk soname 'ha_myptnk.so'"
 
-    qf "drop database test"
+    q "drop database if exists test"
     q "create database test"
     q "use test"
   end

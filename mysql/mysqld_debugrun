@@ -1,5 +1,5 @@
 #!/bin/bash
-./update_build $@
+./update_build $@ || exit
 
 . ./mysqld_vars
 
