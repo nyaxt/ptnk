@@ -14,7 +14,10 @@
 
 - DupKeyLeaf::curUpdate impl.
 
-known issues list:
+mysql storage engine known bugs:
+- db filename is weird 
+
+ptnk known issues list:
 
 VERY CRITICAL
 - PartitionedPageIO needs to be made thread safe

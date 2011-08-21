@@ -1,0 +1,24 @@
+#!/bin/bash
+if [ "$1" == "-d" ]; then
+	sudo rm /usr/local/mysql
+	sudo ln -s /usr/local/mysql-dbg /usr/local/mysql
+	DEBUG_OPTS=-#d:t:F
+	WAF_OPTS=--debug
+else
+	sudo rm /usr/local/mysql
+	sudo ln -s /usr/local/mysql-rel /usr/local/mysql
+fi
+
+(cd ..; ./waf build_rel) || exit
+../waf $WAF_OPTS configure clean build install || exit
+
+. ./mysqld_vars
+
+trap 'killall mysqld; exit' 2 3 9 15
+
+mysqld --datadir=$MYVAR --basedir=$SHARE --lc-messages-dir=$SHARE --socket=$SOCKET --pid=$PIDFILE $DEBUG_OPTS 2>&1 > mysqld.log
+sleep 5
+
+rspec t/myptnk_spec.rb
+
+killall mysqld
