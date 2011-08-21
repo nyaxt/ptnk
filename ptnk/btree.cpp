@@ -134,13 +134,19 @@ Node::handleChildSplit(btree_split_t* split, bool* bOvr, PageIO* pio)
 	PTNK_ASSERT(split->isValid());
 	PTNK_ASSERT(bOvr);
 
+	if(PTNK_UNLIKELY(split->keyNew.isValid()))
+	{
+		// handling keyNew involves Node defrag
+		return handleChildSplitSelfSplit(split, 0, bOvr, pio);
+	}
+
 	if(PTNK_LIKELY(isRoomForSplitAvailable(*split)))
 	{
 		return handleChildSplitNoSelfSplit(split, bOvr, pio);
 	}
 	else
 	{
-		return handleChildSplitSelfSplit(split, bOvr, pio);
+		return handleChildSplitSelfSplit(split, BODY_SIZE/2, bOvr, pio);
 	}
 }
 
@@ -148,6 +154,10 @@ bool
 Node::isRoomForSplitAvailable(const btree_split_t& split) const
 {
 	int sizeFree = footer().sizeFree;
+	if(split.keyNew.isValid() && ! split.keyNew.isNull())
+	{
+		sizeFree -= split.keyNew.valsize();	
+	}
 	for(unsigned int i = 0; i < split.numSplit; ++ i)
 	{
 		sizeFree -= packedsize(split.split[i].key) + sizeof(page_id_t) + sizeof(uint16_t)*2;
@@ -201,7 +211,7 @@ Node::handleChildSplitNoSelfSplit(btree_split_t* split, bool* bOvr, PageIO* pio)
 }
 
 Node
-Node::handleChildSplitSelfSplit(btree_split_t* split, bool* bOvr, PageIO* pio)
+Node::handleChildSplitSelfSplit(btree_split_t* split, size_t thresSplit, bool* bOvr, PageIO* pio)
 {
 	PTNK_ASSERT(footer().numKeys > 2);
 
@@ -224,12 +234,23 @@ Node::handleChildSplitSelfSplit(btree_split_t* split, bool* bOvr, PageIO* pio)
 			for(; i < numKeys; ++ i)
 			{
 				kp_t e = kp(i);
-				kps.push_back(e);
-
 				if(e.second == pgidSplit)
 				{
+					if(split->keyNew.isValid())
+					{
+						kps.push_back(make_pair(split->keyNew.rref(), e.second));
+					}
+					else
+					{
+						kps.push_back(e);
+					}
+
 					++ i;
-					break;	
+					break;
+				}
+				else
+				{
+					kps.push_back(e);
 				}
 			}
 		}
@@ -271,12 +292,23 @@ Node::handleChildSplitSelfSplit(btree_split_t* split, bool* bOvr, PageIO* pio)
 			for(; i < numKeys; ++ i)
 			{
 				ALLOC_COPY_OLDKP(i);
-				kps.push_back(e);
-
 				if(e.second == pgidSplit)
 				{
+					if(split->keyNew.isValid())
+					{
+						kps.push_back(make_pair(split->keyNew.rref(), e.second));
+					}
+					else
+					{
+						kps.push_back(e);
+					}
+
 					++ i;
-					break;	
+					break;
+				}
+				else
+				{
+					kps.push_back(e);
 				}
 			}
 		}
@@ -307,17 +339,28 @@ Node::handleChildSplitSelfSplit(btree_split_t* split, bool* bOvr, PageIO* pio)
 #undef ALLOC_COPY_OLDKP
 	}
 
-	int i = 0, iM = kps.size();
+	split->reset();
+
+	int i = 0, iE = kps.size();
 
 	Node ret = Node(pio->readPage(pageOrigId())); // Node pg carrying split->pgidFollow
 
 	// set up old node
 	ovr.initBody(ptrm1_);
-	for(; i < iM && (ovr.footer().sizeFree > BODY_SIZE/2); ++ i)
+	for(; i < iE; ++ i)
 	{
+		if(ovr.footer().sizeFree + packedsize(kps[i].first) + sizeof(page_id_t) + sizeof(uint16_t)*2 > thresSplit) break;
+
 		ovr.kp_offset(i) = ovr.addKP(kps[i]);
 	}
 	pio->sync(ovr);
+	if(i == iE)
+	{
+		// all kps stored into old node...
+
+		// split was actually not needed!
+		return ret;
+	}
 
 	Node newNode = pio->newInitPage<Node>();
 
@@ -325,7 +368,6 @@ Node::handleChildSplitSelfSplit(btree_split_t* split, bool* bOvr, PageIO* pio)
 	{
 		const kp_t& kp = kps[i++];
 
-		split->reset();
 		split->pgidSplit = pageOrigId();
 		split->addSplit(kp.first, newNode.pageId());
 
@@ -340,7 +382,7 @@ Node::handleChildSplitSelfSplit(btree_split_t* split, bool* bOvr, PageIO* pio)
 	// set up new node
 	// newNode.initBody(); // already done
 	int off = i;
-	for(; i < iM; ++ i)
+	for(; i < iE; ++ i)
 	{
 		newNode.kp_offset(i - off) = newNode.addKP(kps[i]);
 	}
@@ -2776,7 +2818,19 @@ dktree_insert(btree_cursor_t* cur, BufferCRef key, BufferCRef value, btree_split
 			&& curN.leaf.pageType() == PT_LEAF)
 			{
 				*cur = curN;
-				Leaf(cur->leaf).insert(key, value, split, bNotifyOldLink, pio);
+				Leaf l(cur->leaf);
+				bool bUpdateKey = (bufcmp(key, l.keyFirst()) < 0);
+				l.insert(key, value, split, bNotifyOldLink, pio);
+				if(bUpdateKey)
+				{
+					if(! split->isValid())
+					{
+						split->reset();
+						split->pgidSplit = l.pageOrigId();
+					}
+					
+					split->keyNew = key;
+				}
 				return;
 			}
 		}

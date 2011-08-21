@@ -138,7 +138,7 @@ public:
 	bool isRoomForSplitAvailable(const btree_split_t& split) const;
 
 	Node handleChildSplitNoSelfSplit(btree_split_t* split, bool* bOvr, PageIO* pio);
-	Node handleChildSplitSelfSplit(btree_split_t* split, bool* bOvr, PageIO* pio);
+	Node handleChildSplitSelfSplit(btree_split_t* split, size_t thresSplit, bool* bOvr, PageIO* pio);
 
 	bool contains_(page_id_t pgid)
 	{

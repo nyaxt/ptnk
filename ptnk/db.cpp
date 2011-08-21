@@ -240,7 +240,6 @@ DB::Tx::put(BufferCRef key, BufferCRef value, put_mode_t mode)
 	OverviewPage pgOvv(m_pio->readPage(m_pio->pgidStartPage()));
 
 	page_id_t pgidOldRoot = pgOvv.getDefaultTableRoot();
-	if(pgidOldRoot == PGID_INVALID) PTNK_THROW_RUNTIME_ERR("table not found");
 	page_id_t pgidNewRoot = btree_put(pgidOldRoot, key, value, mode, pgOvv.pageOrigId(), m_pio.get());
 	// m_pio->notifyPageWOldLink(pgOvv.pageOrigId()); // this can be safely omitted
 	
