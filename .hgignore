@@ -30,3 +30,4 @@ core$
 ^rubyext/Makefile$
 mkmf\.log$
 rubyext/ptnk\.so$
+^examples/cxx_demo$

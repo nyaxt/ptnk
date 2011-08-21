@@ -70,9 +70,6 @@ describe "MyPTNK" do
       ) ENGINE=myptnk;
     END
 
-    # primary key should be used in select
-    q("describe select * from i where k = 1").first[:key].should eq("PRIMARY")
-
     q("select * from i").count.should eq(0)
 
     (0..9).each do |x|
@@ -84,6 +81,9 @@ describe "MyPTNK" do
       r.count.should eq(1)
       r.first[:v].should eq(x.to_s)
     end
+
+    # primary key should be used in select
+    q("describe select * from i where k = 1").first[:key].should eq("PRIMARY")
   end
 
 end

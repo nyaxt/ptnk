@@ -4282,3 +4282,26 @@ TEST(ptnk, db_drop_partitioned)
 		ASSERT_EQ(ENOENT, errno);
 	}
 }
+
+TEST(ptnk, DISABLED_no_close_db)
+{
+	t_mktmpdir("./_testtmp");
+
+	DB* db = new DB("./_testtmp/noclose", ODEFAULT);
+	db->put(cstr2ref("key"), cstr2ref("value"));
+
+	// leaks intentionally!!!
+}
+
+TEST(ptnk, DISABLED_no_close_db_capi)
+{
+	t_mktmpdir("./_testtmp");
+
+	ptnk_db_t* db = ::ptnk_open("./_testtmp/noclose_c", ODEFAULT, 0644);
+
+	ptnk_tx_t* tx = ::ptnk_tx_begin(db);
+	::ptnk_tx_put_cstr(tx, "key", "value", PUT_INSERT);
+	::ptnk_tx_end(tx, PTNK_TX_COMMIT);
+
+	// leaks intentionally!!!
+}

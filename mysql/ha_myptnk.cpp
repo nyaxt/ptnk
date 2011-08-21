@@ -548,7 +548,7 @@ ha_myptnk::write_row(uchar *buf)
 
 		ptnk_datum_t value_data = {(char*)bufValue, p - bufValue};
 		DEBUG_OUTF("new value dump %02x %02x %02x %02x %02x\n", bufValue[0], bufValue[1], bufValue[2], bufValue[3], bufValue[4]);
-		static ptnk_datum_t null_key = {NULL, 0};
+		static ptnk_datum_t null_key = {NULL, PTNK_NULL_TAG};
 		if(! ptnk_tx_table_put(m_txn->ptnktx, m_ptnktable, null_key, value_data, PTNK_PUT_INSERT))
 		{
 			DEBUG_OUTF("ptnk_tx_put has failed");
