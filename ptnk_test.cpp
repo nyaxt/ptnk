@@ -2168,6 +2168,34 @@ TEST(ptnk, btree_many_dupkeys)
 	EXPECT_EQ(DUPKEY_COUNT, c);
 }
 
+TEST(ptnk, dktree_nonexact_put_after)
+{
+	boost::scoped_ptr<PageIO> pio(new PageIOMem);
+	
+	page_id_t idRoot = btree_init(pio.get());
+	
+	BufferCRef dupkey = cstr2ref("dupkey");
+	static const int DUPKEY_COUNT = 400;
+	for(int i = 0; i < DUPKEY_COUNT; ++ i)
+	{
+		char value[32]; sprintf(value, "dupvalue%d", i);
+		idRoot = btree_put(idRoot, dupkey, cstr2ref(value), PUT_INSERT, PGID_INVALID, pio.get());
+	}
+	idRoot = btree_put(idRoot, cstr2ref("cccccc"), cstr2ref("cval"), PUT_INSERT, PGID_INVALID, pio.get());
+	idRoot = btree_put(idRoot, cstr2ref("eeeeee"), cstr2ref("eval"), PUT_INSERT, PGID_INVALID, pio.get());
+
+	idRoot = btree_put(idRoot, cstr2ref("eaaaaa"), cstr2ref("waaaah"), PUT_INSERT, PGID_INVALID, pio.get());
+
+	// pio->readPage(idRoot).dump(pio.get());
+	
+	Buffer v;
+	v.setValsize(btree_get(idRoot, cstr2ref("eaaaaa"), v.wref(), pio.get()));
+	v.makeNullTerm();
+
+	EXPECT_TRUE(v.isValid());
+	EXPECT_STREQ(v.get(), "waaaah");
+}
+
 TEST(ptnk, btree_cursor_put)
 {
 	boost::scoped_ptr<PageIO> pio(new PageIOMem);
