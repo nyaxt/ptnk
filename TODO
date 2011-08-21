@@ -1,3 +1,5 @@
+- ptnk_bindump seems to be broken
+
 - bNotifyOldLink is confusing -> change to bOvr
   -> done partiallly
 

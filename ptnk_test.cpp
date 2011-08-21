@@ -4167,6 +4167,39 @@ TEST(ptnk, ptnk_capi_delete_all_records)
 	::ptnk_close(db);
 }
 
+TEST(ptnk, ptnk_capi_noexistant_table)
+{
+	t_mktmpdir("./_testtmp");
+
+	ptnk_db_t* db = ::ptnk_open("./_testtmp/capi_noexistanttable.ptnk", ODEFAULT, 0644);
+	ASSERT_TRUE(db);
+
+	ptnk_tx_t* tx = ::ptnk_tx_begin(db);
+
+	// poke around non-existant table _t_ and make sure that no SEGV occur
+
+	ptnk_table_t* t = ::ptnk_table_open_cstr("table");
+
+	{
+		ptnk_datum_t key = {"asdffdsa", 8};
+		ptnk_datum_t value = ::ptnk_tx_table_get(tx, t, key);
+		EXPECT_EQ(value.dsize, -1);
+	}
+
+	EXPECT_STREQ(NULL, ::ptnk_tx_table_get_cstr(tx, t, "a"));
+
+	{
+		ptnk_cur_t* c = ::ptnk_cur_front(tx, t);
+		EXPECT_FALSE(c);
+
+		::ptnk_cur_close(c);
+	}
+
+	::ptnk_tx_end(tx, PTNK_TX_ABORT);
+
+	::ptnk_close(db);
+}
+
 TEST(ptnk, db_drop)
 {
 	t_mktmpdir("./_testtmp");

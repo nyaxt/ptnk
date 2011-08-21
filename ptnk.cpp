@@ -4,7 +4,7 @@
 #include <fcntl.h>
 
 #define PTNK_READ_BUF_SIZE 4096
-// #define PTNK_LOG_ALL_CAPI
+#define PTNK_LOG_ALL_CAPI
 
 #ifdef PTNK_LOG_ALL_CAPI
 #include <stdio.h>
@@ -341,18 +341,21 @@ ptnk_tx_get_cstr(ptnk_tx_t* tx, const char* key)
 ptnk_table_t*
 ptnk_table_open(ptnk_datum_t tableid)
 {
+	LOG_OUTF("ptnk_table_open(tableid = {%p, %d});\n", tableid.dptr, tableid.dsize);
 	return static_cast<ptnk_table_t*>(new ptnk::TableOffCache(datum2CRef(tableid)));
 }
 
 ptnk_table_t*
 ptnk_table_open_cstr(const char* tableid)
 {
+	LOG_OUTF("ptnk_table_open_cstr(tableid = %s);\n", tableid);
 	return static_cast<ptnk_table_t*>(new ptnk::TableOffCache(ptnk::cstr2ref(tableid)));
 }
 
 void
 ptnk_table_close(ptnk_table_t* table)
 {
+	LOG_OUTF("ptnk_table_close(table = %p);\n", table);
 	delete static_cast<ptnk::TableOffCache*>(table);
 }
 

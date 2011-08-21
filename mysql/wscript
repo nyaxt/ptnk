@@ -18,12 +18,14 @@ def configure(conf):
 
 	if Options.options.debug:
 		conf.env.append_unique('CXXFLAGS', ['-DUNIV_MUST_NOT_INLINE', '-DEXTRA_DEBUG', '-DFORCE_INIT_OF_VARS', '-DSAFE_MUTEX', '-DMYPTNK_DEBUG'])
+		conf.env.append_unique('LIBPATH', ['/home/kouhei/ptnk/build/dbg'])
 	else:
 		conf.env.append_unique('CXXFLAGS', ['-DDBUG_OFF'])
+		conf.env.append_unique('LIBPATH', ['/home/kouhei/ptnk/build/rel'])
 
 	conf.env.append_unique('LINKFLAGS', ['-fno-exceptions', '-fno-rtti'])
 	conf.env.append_unique('INCLUDES', ['/home/kouhei/local/include', '/usr/local/include', '/home/kouhei/ptnk'])
-	conf.env.append_unique('LIBPATH', ['/home/kouhei/local/lib', '/usr/local/lib', '/home/kouhei/ptnk/build/rel'])
+	conf.env.append_unique('LIBPATH', ['/home/kouhei/local/lib', '/usr/local/lib'])
 
 	conf.load('compiler_cxx boost')
 
