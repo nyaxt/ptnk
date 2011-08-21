@@ -4181,9 +4181,9 @@ TEST(ptnk, ptnk_capi_noexistant_table)
 	ptnk_table_t* t = ::ptnk_table_open_cstr("table");
 
 	{
-		ptnk_datum_t key = {"asdffdsa", 8};
+		ptnk_datum_t key = {(char*)"asdffdsa", 8};
 		ptnk_datum_t value = ::ptnk_tx_table_get(tx, t, key);
-		EXPECT_EQ(value.dsize, -1);
+		EXPECT_EQ(value.dsize, PTNK_ERR_TAG);
 	}
 
 	EXPECT_STREQ(NULL, ::ptnk_tx_table_get_cstr(tx, t, "a"));

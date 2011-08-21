@@ -28,8 +28,14 @@ struct ptnk_datum
 {
 	char* dptr;
 	int dsize;
+
+/* special dsize values */
+#define PTNK_NOENT_TAG	-1
+#define PTNK_NULL_TAG	-2
+#define PTNK_ERR_TAG	-3
 };
 typedef struct ptnk_datum ptnk_datum_t;
+
 
 /* ptnk C apis */
 

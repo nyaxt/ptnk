@@ -178,6 +178,7 @@ DB::Tx::get(BufferCRef table, BufferCRef key, BufferRef value)
 {
 	OverviewPage pgOvv(m_pio->readPage(m_pio->pgidStartPage()));
 	page_id_t pgidRoot = pgOvv.getTableRoot(table);
+	if(pgidRoot == PGID_INVALID) PTNK_THROW_RUNTIME_ERR("table not found");
 
 	return btree_get(pgidRoot, key, value, m_pio.get());
 }
@@ -187,6 +188,7 @@ DB::Tx::get(TableOffCache* table, BufferCRef key, BufferRef value)
 {
 	OverviewPage pgOvv(m_pio->readPage(m_pio->pgidStartPage()));
 	page_id_t pgidRoot = pgOvv.getTableRoot(table);
+	if(pgidRoot == PGID_INVALID) PTNK_THROW_RUNTIME_ERR("table not found");
 
 	return btree_get(pgidRoot, key, value, m_pio.get());
 }
@@ -204,6 +206,7 @@ DB::Tx::put(BufferCRef table, BufferCRef key, BufferCRef value, put_mode_t mode)
 	OverviewPage pgOvv(m_pio->readPage(m_pio->pgidStartPage()));
 
 	page_id_t pgidOldRoot = pgOvv.getTableRoot(table);
+	if(pgidOldRoot == PGID_INVALID) PTNK_THROW_RUNTIME_ERR("table not found");
 	page_id_t pgidNewRoot = btree_put(pgidOldRoot, key, value, mode, pgOvv.pageOrigId(), m_pio.get());
 	// m_pio->notifyPageWOldLink(pgOvv.pageOrigId()); // this can be safely omitted
 	
@@ -220,6 +223,7 @@ DB::Tx::put(TableOffCache* table, BufferCRef key, BufferCRef value, put_mode_t m
 	OverviewPage pgOvv(m_pio->readPage(m_pio->pgidStartPage()));
 
 	page_id_t pgidOldRoot = pgOvv.getTableRoot(table);
+	if(pgidOldRoot == PGID_INVALID) PTNK_THROW_RUNTIME_ERR("table not found");
 	page_id_t pgidNewRoot = btree_put(pgidOldRoot, key, value, mode, pgOvv.pageOrigId(), m_pio.get());
 	// m_pio->notifyPageWOldLink(pgOvv.pageOrigId()); // this can be safely omitted
 	
@@ -236,6 +240,7 @@ DB::Tx::put(BufferCRef key, BufferCRef value, put_mode_t mode)
 	OverviewPage pgOvv(m_pio->readPage(m_pio->pgidStartPage()));
 
 	page_id_t pgidOldRoot = pgOvv.getDefaultTableRoot();
+	if(pgidOldRoot == PGID_INVALID) PTNK_THROW_RUNTIME_ERR("table not found");
 	page_id_t pgidNewRoot = btree_put(pgidOldRoot, key, value, mode, pgOvv.pageOrigId(), m_pio.get());
 	// m_pio->notifyPageWOldLink(pgOvv.pageOrigId()); // this can be safely omitted
 	
@@ -267,6 +272,7 @@ DB::Tx::curNew(BufferCRef table)
 
 	OverviewPage pgOvv(m_pio->readPage(m_pio->pgidStartPage()));
 	cur->pgidRoot = pgOvv.getTableRoot(table);
+	if(cur->pgidRoot == PGID_INVALID) PTNK_THROW_RUNTIME_ERR("table not found");
 	cur->curBTree = btree_cursor_new();
 	cur->tableid = table;
 
@@ -281,6 +287,7 @@ DB::Tx::curNew(TableOffCache* table)
 
 	OverviewPage pgOvv(m_pio->readPage(m_pio->pgidStartPage()));
 	cur->pgidRoot = pgOvv.getTableRoot(table);
+	if(cur->pgidRoot == PGID_INVALID) PTNK_THROW_RUNTIME_ERR("table not found");
 	cur->curBTree = btree_cursor_new();
 	cur->tableid = table->getTableId();
 

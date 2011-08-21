@@ -102,8 +102,38 @@ struct ptnk_cur
 	catch(...) \
 	{ \
 		handle->ptnk_errno = EINVAL; \
-		std::cerr << __func__ << ": unknown exception caught" << std::endl;; \
+		std::cerr << __func__ << ": unknown exception caught" << std::endl; \
 		return 0; \
+	}
+
+#define COMMON_CATCH_BLOCKS_DATUM(handle) \
+	catch(std::exception& e) \
+	{ \
+		handle->ptnk_errno = EINVAL; \
+		std::cerr << __func__ << ": " << e.what() << std::endl; \
+		ptnk_datum ret = {NULL, PTNK_ERR_TAG}; \
+		return ret; \
+	} \
+	catch(...) \
+	{ \
+		handle->ptnk_errno = EINVAL; \
+		std::cerr << __func__ << ": unknown exception caught" << std::endl; \
+		ptnk_datum ret = {NULL, PTNK_ERR_TAG}; \
+		return ret; \
+	}
+
+#define COMMON_CATCH_BLOCKS_PTR(handle) \
+	catch(std::exception& e) \
+	{ \
+		handle->ptnk_errno = EINVAL; \
+		std::cerr << __func__ << ": " << e.what() << std::endl; \
+		return NULL; \
+	} \
+	catch(...) \
+	{ \
+		handle->ptnk_errno = EINVAL; \
+		std::cerr << __func__ << ": unknown exception caught" << std::endl; \
+		return NULL; \
 	}
 
 inline
@@ -115,10 +145,21 @@ datum2CRef(ptnk_datum_t d)
 
 ptnk_db_t*
 ptnk_open(const char* filename, ptnk_opts_t opts, int mode)
+try
 {
 	LOG_OUTF("ptnk_open(filename = %s, opts = %d, mode = 0%o);\n", filename, opts, mode);
 
 	return new ptnk_db_t(new ptnk::DB(filename, opts, mode));;
+}
+catch(std::exception& e)
+{
+	std::cerr << __func__ << ": " << e.what() << std::endl;
+	return NULL;
+}
+catch(...)
+{
+	std::cerr << __func__ << ": unknown exception caught" << std::endl;;
+	return NULL;
 }
 
 ptnk_db_t*
@@ -160,8 +201,14 @@ try
 
 	return 1;
 }
+catch(std::exception& e)
+{
+	std::cerr << __func__ << ": " << e.what() << std::endl;
+	return 0;
+}
 catch(...)
 {
+	std::cerr << __func__ << ": unknown exception caught" << std::endl;
 	return 0;
 }
 
@@ -182,10 +229,11 @@ catch(ptnk::ptnk_duplicate_key_error&)
 	db->ptnk_errno = PTNK_EDUPKEY;
 	return 0;
 }
-COMMON_CATCH_BLOCKS(db);
+COMMON_CATCH_BLOCKS(db)
 
 int
 ptnk_put_cstr(ptnk_db_t* db, const char* key, const char* value, int mode)
+try
 {
 	LOG_OUTF("ptnk_put_cstr(db = %p, key = %s, value = %s, mode = %d);\n", db, key, value, mode);
 
@@ -194,9 +242,11 @@ ptnk_put_cstr(ptnk_db_t* db, const char* key, const char* value, int mode)
 
 	return ptnk_put(db, k, v, (ptnk::put_mode_t)mode);
 }
+COMMON_CATCH_BLOCKS(db)
 
 ptnk_datum_t
 ptnk_get(ptnk_db_t* db, ptnk_datum_t key)
+try
 {
 	LOG_OUTF("ptnk_get(db = %p, key = {%p, %u});\n", db, key.dptr, key.dsize);
 
@@ -205,9 +255,11 @@ ptnk_get(ptnk_db_t* db, ptnk_datum_t key)
 	ptnk_datum_t ret = {db->read_buf.get(), db->read_buf.valsize()};
 	return ret;
 }
+COMMON_CATCH_BLOCKS_DATUM(db)
 
 const char*
 ptnk_get_cstr(ptnk_db_t* db, const char* key)
+try
 {
 	LOG_OUTF("ptnk_get_cstr(db = %p, key = %s);\n", db, key);
 
@@ -226,6 +278,7 @@ ptnk_get_cstr(ptnk_db_t* db, const char* key)
 		return NULL;
 	}
 }
+COMMON_CATCH_BLOCKS_PTR(db)
 
 int
 ptnk_error(ptnk_db_t* db)
@@ -243,10 +296,12 @@ ptnk_clearerr(ptnk_db_t* db)
 
 ptnk_tx_t*
 ptnk_tx_begin(ptnk_db_t* db)
+try
 {
 	LOG_OUTF("ptnk_tx_begin(db = %p);\n", db);
 	return new ptnk_tx_t(db->impl->newTransaction());
 }
+COMMON_CATCH_BLOCKS_PTR(db)
 
 int
 ptnk_tx_end(ptnk_tx_t* tx, int commit)
@@ -311,6 +366,7 @@ COMMON_CATCH_BLOCKS(tx)
 
 ptnk_datum_t
 ptnk_tx_get(ptnk_tx_t* tx, ptnk_datum_t key)
+try
 {
 	LOG_OUTF("ptnk_tx_get(tx = %p, key = {%p, %u});\n", tx, key.dptr, key.dsize);
 
@@ -319,9 +375,11 @@ ptnk_tx_get(ptnk_tx_t* tx, ptnk_datum_t key)
 	ptnk_datum_t ret = {tx->read_buf.get(), tx->read_buf.valsize()};
 	return ret;
 }
+COMMON_CATCH_BLOCKS_DATUM(tx)
 
 const char*
 ptnk_tx_get_cstr(ptnk_tx_t* tx, const char* key)
+try
 {
 	LOG_OUTF("ptnk_tx_get_cstr(tx = %p, key = %s);\n", tx, key);
 
@@ -337,6 +395,7 @@ ptnk_tx_get_cstr(ptnk_tx_t* tx, const char* key)
 		return NULL;
 	}
 }
+COMMON_CATCH_BLOCKS_PTR(tx)
 
 ptnk_table_t*
 ptnk_table_open(ptnk_datum_t tableid)
@@ -399,8 +458,9 @@ COMMON_CATCH_BLOCKS(tx)
 
 ptnk_datum_t
 ptnk_tx_table_get(ptnk_tx_t* tx, ptnk_table_t* table, ptnk_datum_t key)
+try
 {
-	LOG_OUTF("ptnk_tx_get(tx = %p, table = %p, key = {%p, %u});\n", tx, table, key.dptr, key.dsize);
+	LOG_OUTF("ptnk_tx_table_get(tx = %p, table = %p, key = {%p, %u});\n", tx, table, key.dptr, key.dsize);
 
 	ptnk::TableOffCache* toc = static_cast<ptnk::TableOffCache*>(table);
 	tx->impl->get(toc, datum2CRef(key), &tx->read_buf);
@@ -408,11 +468,13 @@ ptnk_tx_table_get(ptnk_tx_t* tx, ptnk_table_t* table, ptnk_datum_t key)
 	ptnk_datum_t ret = {tx->read_buf.get(), tx->read_buf.valsize()};
 	return ret;
 }
+COMMON_CATCH_BLOCKS_DATUM(tx)
 
 const char*
 ptnk_tx_table_get_cstr(ptnk_tx_t* tx, ptnk_table_t* table, const char* key)
+try
 {
-	LOG_OUTF("ptnk_tx_get_cstr(tx = %p, key = %s);\n", tx, key);
+	LOG_OUTF("ptnk_tx_table_get_cstr(tx = %p, key = %s);\n", tx, key);
 
 	ptnk::TableOffCache* toc = static_cast<ptnk::TableOffCache*>(table);
 	tx->impl->get(toc, ptnk::cstr2ref(key), &tx->read_buf);
@@ -427,9 +489,11 @@ ptnk_tx_table_get_cstr(ptnk_tx_t* tx, ptnk_table_t* table, const char* key)
 		return NULL;
 	}
 }
+COMMON_CATCH_BLOCKS_PTR(tx)
 
 ptnk_cur_t*
 ptnk_cur_front(ptnk_tx_t* tx, ptnk_table_t* table)
+try
 {
 	LOG_OUTF("ptnk_cur_front(tx = %p, table = %p);\n", tx, table);
 	
@@ -445,9 +509,11 @@ ptnk_cur_front(ptnk_tx_t* tx, ptnk_table_t* table)
 		return NULL;	
 	}
 }
+COMMON_CATCH_BLOCKS_PTR(tx)
 
 ptnk_cur_t*
 ptnk_query(ptnk_tx_t* tx, ptnk_table_t* table, ptnk_datum_t key, int query_type)
+try
 {
 	LOG_OUTF("ptnk_query(tx = %p, table = %p, key = {%p, %d}, query_type = %d);\n", tx, table, key.dptr, key.dsize, query_type);
 	
@@ -465,6 +531,7 @@ ptnk_query(ptnk_tx_t* tx, ptnk_table_t* table, ptnk_datum_t key, int query_type)
 		return NULL;	
 	}
 }
+COMMON_CATCH_BLOCKS_PTR(tx)
 
 int
 ptnk_cur_next(ptnk_cur_t* cur)
@@ -604,6 +671,7 @@ COMMON_CATCH_BLOCKS(tx)
 
 const char*
 ptnk_tx_table_get_name_cstr(ptnk_tx_t* tx, int idx)
+try
 {
 	LOG_OUTF("ptnk_tx_table_get_name_cstr(tx = %p, idx = %d);\n", tx, idx);
 
@@ -623,3 +691,4 @@ ptnk_tx_table_get_name_cstr(ptnk_tx_t* tx, int idx)
 		return NULL;
 	}
 }
+COMMON_CATCH_BLOCKS_PTR(tx)
