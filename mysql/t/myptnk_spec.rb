@@ -86,4 +86,63 @@ describe "MyPTNK" do
     q("describe select * from i where k = 1").first[:key].should eq("PRIMARY")
   end
 
+  it "should be able to handle table with a secondary index" do
+    q "drop table if exists s"
+    q <<-END
+      create table s (
+        i int primary key,
+        i2 int,
+        v varchar(32),
+        key (i2)
+      ) ENGINE=myptnk;
+    END
+
+    (0..9).each do |x|
+      q %Q{insert into s values (#{x}, #{10-x}, '#{x}')}
+    end
+
+    # secondary key should be used in select
+    q("describe select * from s where i2 = 1").first[:key].should eq("i2")
+
+    (0..9).each do |x|
+      r = q("select v from s where i2 = #{10-x}")
+      r.count.should eq(1)
+      r.first[:v].should eq(x.to_s)
+    end
+  end
+
+  it "should be able to handle table with a compound key index" do
+    q "drop table if exists c"
+    q <<-END
+      create table c(
+        i int primary key,
+        a int,
+        b int,
+        key kc (a, b)
+      ) ENGINE=myptnk;
+    END
+
+    (0..9).each do |x|
+      q %Q{insert into c values (#{x}, #{x*2}, #{x*3})}
+    end
+
+    # compound key should be used in select
+    q("describe select * from c where a = 2 and b = 4").first[:key].should eq("kc")
+    q("describe select * from c where a = 2").first[:key].should eq("kc")
+
+    # full key search
+    (0..9).each do |x|
+      r = q("select i from c where a = #{x*2} and b = #{x*3}")
+      r.count.should eq(1)
+      r.first[:i].should eq(x)
+    end
+
+    # partial key search
+    (0..9).each do |x|
+      r = q("select i from c where a = #{x*2}")
+      r.count.should eq(1)
+      r.first[:i].should eq(x)
+    end
+  end
+
 end
