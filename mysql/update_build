@@ -2,7 +2,6 @@
 if [ "$1" == "-d" ]; then
 	sudo rm /usr/local/mysql
 	sudo ln -s /usr/local/mysql-dbg /usr/local/mysql
-	DEBUG_OPTS=-#d:t:F
 	WAF_OPTS=--debug
 	VARIANT=dbg
 else
@@ -13,4 +12,3 @@ fi
 
 (cd ..; ./waf build_$VARIANT) || exit
 ../waf $WAF_OPTS configure clean build install || exit
-

@@ -145,4 +145,47 @@ describe "MyPTNK" do
     end
   end
 
+  it "should be able to handle cursor" do
+    q "drop table if exists r"
+    q <<-END
+      create table r (
+        k int primary key,
+        v varchar(8)
+      ) ENGINE=myptnk;
+    END
+
+    (0..9).each do |x|
+      q %Q{insert into r values (#{x}, '#{x}')}
+    end
+
+    q <<-END
+      create procedure curfirst(out tk int, out tv varchar(8))
+      begin
+        declare cur cursor for select * from r;
+
+        open cur;
+        fetch cur into tk, tv;
+        close cur;
+      end
+    END
+
+    q "call curfirst(@k, @v)"
+    q("select @k, @v").first.should eq({:@k => 0, :@v => '0'})
+
+    q <<-END
+      create procedure cursecond(out tk int, out tv varchar(8))
+      begin
+        declare cur cursor for select * from r;
+
+        open cur;
+        fetch cur into tk, tv;
+        fetch cur into tk, tv;
+        close cur;
+      end
+    END
+
+    q "call cursecond(@k, @v)"
+    q("select @k, @v").first.should eq({:@k => 1, :@v => '1'})
+  end
+
 end

@@ -1,6 +1,10 @@
 #!/bin/bash
 ./update_build $@ || exit
 
+if [ "$1" == "-d"]; then
+	DEBUG_OPTS=-#d:t:F
+fi
+
 . ./mysqld_vars
 
 trap 'killall mysqld; exit' 2 3 9 15

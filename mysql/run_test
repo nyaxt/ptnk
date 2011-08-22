@@ -2,6 +2,10 @@
 ./update_build $@ || exit
 . ./mysqld_vars
 
+if [ "$1" == "-d" ]; then
+	DEBUG_OPTS=-#d:t:F
+fi
+
 trap 'killall mysqld; exit' 2 3 9 15
 
 mysqld --datadir=$MYVAR --basedir=$SHARE --lc-messages-dir=$SHARE --socket=$SOCKET --pid=$PIDFILE $DEBUG_OPTS &> mysqld.log &
