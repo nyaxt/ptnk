@@ -473,13 +473,19 @@ ha_myptnk::pack_key_from_mysqlrow(KEY* key, uchar *buf, char* dest)
 				*(unsigned long*)p = htonl(*(unsigned long*)(buf + field->offset(buf))); p += 4;
 				break;
 
+			case MYSQL_TYPE_SHORT:
+				*(unsigned short*)p = htons(*(unsigned short*)(buf + field->offset(buf))); p += 2;
+				break;
+
 			case MYSQL_TYPE_STRING:
 			case MYSQL_TYPE_VARCHAR:
 				{
-					unsigned short len = field->data_length();
-					int len_bytes = len > 255 ? 2 : 1;
-					*(unsigned short*)p = len; p += 2;
-					::memcpy(p, buf + field->offset(buf) + len_bytes, len); p += len;
+					size_t flen = field->row_pack_length(); // field length
+					unsigned short dlen = field->data_length(); // value length
+					int len_bytes = dlen > 255 ? 2 : 1;
+					::memcpy(p, buf + field->offset(buf) + len_bytes, dlen);
+					::memset(p + dlen, 0, flen - dlen); // pad left over bytes
+					p += flen;
 				}
 				break;
 
@@ -494,7 +500,10 @@ ha_myptnk::pack_key_from_mysqlrow(KEY* key, uchar *buf, char* dest)
 		lenKey = p - dest;
 	}
 	DEBUG_OUTF("packed key len: %lu\n", lenKey);
-	DEBUG_OUTF("packed key dump %02x %02x %02x %02x %02x\n", dest[0], dest[1], dest[2], dest[3], dest[4]);
+	DEBUG_OUTF("packed key dump %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x \n",
+		dest[0], dest[1], dest[2], dest[3], dest[4], dest[5], dest[6], dest[7], 
+		dest[8], dest[9], dest[10], dest[11], dest[12], dest[13], dest[14], dest[15]
+		);
 
 	return lenKey;
 }
@@ -755,6 +764,10 @@ ha_myptnk::pack_key_from_mysqlkey(KEY* key, char* dest, size_t* szDest, const uc
 
 	DEBUG_OUTF("pack_key_from_mysqlkey\n");
 	DEBUG_OUTF("keypart_map: %x\n", keypart_map);
+	DEBUG_OUTF("keyd %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x \n",
+		keyd[0], keyd[1], keyd[2], keyd[3], keyd[4], keyd[5], keyd[6], keyd[7], 
+		keyd[8], keyd[9], keyd[10], keyd[11], keyd[12], keyd[13], keyd[14], keyd[15]
+		);
 
 	char* p = dest;
 
@@ -792,7 +805,7 @@ ha_myptnk::pack_key_from_mysqlkey(KEY* key, char* dest, size_t* szDest, const uc
 			break;
 
 		case MYSQL_TYPE_SHORT:
-			*(unsigned short*)p = *(unsigned short*)keyd; p += 2; keyd += 2;
+			*(unsigned short*)p = htons(*(unsigned short*)keyd); p += 2; keyd += 2;
 			break;
 
 		case MYSQL_TYPE_LONG:
@@ -802,10 +815,12 @@ ha_myptnk::pack_key_from_mysqlkey(KEY* key, char* dest, size_t* szDest, const uc
 		case MYSQL_TYPE_STRING:
 		case MYSQL_TYPE_VARCHAR:
 			{
-				unsigned short len = *(unsigned short*)keyd; keyd += 2;
-				*(unsigned short*)p = len; p += 2;
-				::memcpy(p, keyd, len);
-				p += len; keyd += len;
+				size_t flen = key_part->field->row_pack_length(); // field length
+				DEBUG_OUTF("flen: %u\n", flen);
+				unsigned short dlen = *(unsigned short*)keyd; keyd += 2; // value length
+				::memcpy(p, keyd, dlen);
+				::memset(p + dlen, 0, flen-dlen); // pad left over bytes
+				p += flen; keyd += flen;
 			}
 			break;
 
@@ -844,7 +859,11 @@ ha_myptnk::pack_key_from_mysqlkey(KEY* key, char* dest, size_t* szDest, const uc
 
 		case MYSQL_TYPE_STRING:
 		case MYSQL_TYPE_VARCHAR:
-			DEBUG_OUTF("FIXME FIXME\n");
+			{
+				size_t flen = key_part->field->row_pack_length(); // field length
+				::memset(p, 0, flen);
+				p += flen;
+			}
 			break;
 
 		default:
@@ -855,7 +874,10 @@ ha_myptnk::pack_key_from_mysqlkey(KEY* key, char* dest, size_t* szDest, const uc
 
 	*szDest = p - dest;
 	DEBUG_OUTF("packed key len: %lu\n", *szDest);
-	DEBUG_OUTF("packed key dump %02x %02x %02x %02x %02x\n", dest[0], dest[1], dest[2], dest[3], dest[4]);
+	DEBUG_OUTF("packed key dump %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x \n",
+		dest[0], dest[1], dest[2], dest[3], dest[4], dest[5], dest[6], dest[7], 
+		dest[8], dest[9], dest[10], dest[11], dest[12], dest[13], dest[14], dest[15]
+		);
 
 	return bPackedAll;
 }

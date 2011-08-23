@@ -145,6 +145,55 @@ describe "MyPTNK" do
     end
   end
 
+  it "should be able to handle varchar keys" do
+    q "drop table if exists vck"
+    q <<-END
+      create table vck(
+        k varchar(8) primary key,
+        v int 
+      ) ENGINE=myptnk;
+    END
+    
+    (0..9).each do |x|
+      q %Q{insert into vck values ('#{x}', #{x})}
+    end
+
+    (0..9).each do |x|
+      r = q("select v from vck where k = '#{x}'")
+      r.count.should eq(1)
+      r.first[:v].should eq(x)
+    end
+  end
+
+  it "should be able to handle compound key w/ varchar" do
+    q "drop table if exists vck2"
+    q <<-END
+      create table vck2(
+        k varchar(8),
+        k2 int,
+        primary key (k, k2)
+      ) ENGINE=myptnk;
+    END
+    
+    (0..9).each do |x|
+      q %Q{insert into vck2 values ('#{x}', #{x})}
+    end
+
+    # full key search
+    (0..9).each do |x|
+      r = q("select k2 from vck2 where k = '#{x}' and k2 = #{x}")
+      r.count.should eq(1)
+      r.first[:k2].should eq(x)
+    end
+
+    # partial key search
+    (0..9).each do |x|
+      r = q("select k2 from vck2 where k = '#{x}'")
+      r.count.should eq(1)
+      r.first[:k2].should eq(x)
+    end
+  end
+
   it "should be able to handle cursor" do
     q "drop table if exists r"
     q <<-END

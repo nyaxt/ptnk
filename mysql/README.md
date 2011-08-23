@@ -6,6 +6,10 @@ Ptnk storage engine is still at very early stage of development.
 
 **DO NOT STORE VALUABLE DATA YET**
 
+## TODO
+* update of indexed columns
+* update/delete by secondary keys
+
 ## How to try
 * apt-get install cmake
 * get mysql source dist
