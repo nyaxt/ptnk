@@ -919,6 +919,8 @@ ha_myptnk::index_read_map(uchar *buf, const uchar *key, key_part_map keypart_map
 		}
 		else
 		{
+			DEBUG_OUTF("exact match specified but relieving it to non-exact match as not all key_parts have been specified\n");
+
 			// not all key_parts have been specified	
 			// packed key for non-specified key_parts are zero-filled,
 			// so query type must be loosened to match them.
@@ -1135,12 +1137,14 @@ ha_myptnk::rnd_next(uchar *buf)
 
 		// -- query main table
 		value = ::ptnk_tx_table_get(m_txn->ptnktx, m_ptnktable, pkey);
-		if(value.dsize < 0)
-		{
-			rc = HA_ERR_INTERNAL_ERROR;
-			MYSQL_READ_ROW_DONE(rc);
-			DBUG_RETURN(rc);
-		}
+	}
+
+	DEBUG_OUTF("value.dsize: %d\n", value.dsize);
+	if(value.dsize < 0)
+	{
+		rc = HA_ERR_INTERNAL_ERROR;
+		MYSQL_READ_ROW_DONE(rc);
+		DBUG_RETURN(rc);
 	}
 
 	{
