@@ -7,8 +7,6 @@
 
 #include <ptnk.h>
 
-using namespace ptnk;
-
 extern "C"
 {
 
@@ -21,27 +19,27 @@ VALUE RBK_table = Qnil;
 VALUE RBK_cur = Qnil;
 
 inline
-BufferCRef
+ptnk::BufferCRef
 val2cref(VALUE val, VALUE* tmp)
 {
 	if(PTNK_UNLIKELY(NIL_P(val)))
 	{
-		return BufferCRef::NULL_VAL;	
+		return ptnk::BufferCRef::NULL_VAL;	
 	}
 	else if(FIXNUM_P(val))
 	{
 		static unsigned long n = htonl(FIX2ULONG(val));
-		return BufferCRef(&n, sizeof(unsigned long));
+		return ptnk::BufferCRef(&n, sizeof(unsigned long));
 	}
 	else
 	{
 		*tmp = StringValue(val);	
-		return BufferCRef(RSTRING_PTR(*tmp), RSTRING_LEN(*tmp));
+		return ptnk::BufferCRef(RSTRING_PTR(*tmp), RSTRING_LEN(*tmp));
 	}
 }
 
 VALUE
-cref2val(const BufferCRef& buf)
+cref2val(const ptnk::BufferCRef& buf)
 {
 	if(buf.isNull())
 	{
@@ -82,7 +80,7 @@ db_new(int argc, VALUE* argv, VALUE klass)
 	ret = Data_Make_Struct(klass, rb_ptnk_db, 0, rb_ptnk_db_free, db);
 
 	const char* filename = "";
-	ptnk_opts_t opts = ODEFAULT;
+	ptnk_opts_t opts = ptnk::ODEFAULT;
 	int mode = 0644;
 
 	switch(argc)
@@ -117,13 +115,13 @@ db_get(VALUE self, VALUE key)
 	VALUE ret = rb_str_buf_new(2048);
 
 	VALUE tmpKey;
-	ssize_t sz = db->impl->get(val2cref(key, &tmpKey), BufferRef(RSTRING(ret)->as.heap.ptr, 2048));
+	ssize_t sz = db->impl->get(val2cref(key, &tmpKey), ptnk::BufferRef(RSTRING(ret)->as.heap.ptr, 2048));
 	if(sz >= 0)
 	{
 		RSTRING(ret)->as.heap.len = sz;
 		return ret;
 	}
-	else if(sz == BufferCRef::NULL_TAG)
+	else if(sz == ptnk::BufferCRef::NULL_TAG)
 	{
 		return Qnil;	
 	}
@@ -144,10 +142,10 @@ db_put(int argc, VALUE* argv, VALUE self)
 
 	GET_DB_WRAP;
 
-	put_mode_t pm = PUT_UPDATE;
+	ptnk::put_mode_t pm = ptnk::PUT_UPDATE;
 	if(argc > 3)
 	{
-		pm = (put_mode_t)FIX2INT(argv[2]);
+		pm = static_cast<ptnk::put_mode_t>(FIX2INT(argv[2]));
 	}
 
 	VALUE tmpKey, tmpVal;
@@ -236,7 +234,7 @@ dbtx_table_get_names(VALUE self)
 
 	for(int i = 0;; ++ i)
 	{
-		Buffer name;
+		ptnk::Buffer name;
 		dbtx->impl->tableGetName(i, &name);
 
 		if(! name.isValid()) break;
@@ -271,12 +269,12 @@ table_new(VALUE klass, VALUE vtableid)
 	rb_ptnk_table* table;
 	VALUE ret = Data_Make_Struct(klass, rb_ptnk_table, 0, rb_ptnk_table_free, table);
 
-	table->impl = new TableOffCache(val2cref(vtableid, &tmp));
+	table->impl = new ptnk::TableOffCache(val2cref(vtableid, &tmp));
 
 	return ret;
 }
 #define GET_TABLE_WRAP(VAL) \
-	if(! rb_obj_is_kind_of(vtable, RBK_table)) rb_raise(rb_eArgError, "arg must be Ptnk::Table"); \
+	if(! rb_obj_is_kind_of(VAL, RBK_table)) rb_raise(rb_eArgError, "arg must be Ptnk::Table"); \
 	rb_ptnk_table* table; \
 	Data_Get_Struct(VAL, rb_ptnk_table, table); \
 	if(! table->impl) rb_raise(rb_eArgError, "table already freed");
@@ -287,13 +285,6 @@ struct rb_ptnk_cur
 	VALUE vtable;
 	ptnk::DB::Tx::cursor_t* impl;
 };
-#define GET_CUR_WRAP(VAL) \
-	rb_ptnk_cur* cur; \
-	Data_Get_Struct(VAL, rb_ptnk_cur, cur); \
-	if(! cur->impl) rb_raise(rb_eArgError, "cursor already freed"); \
-	rb_ptnk_dbtx* dbtx; \
-	Data_Get_Struct(cur->vtx, rb_ptnk_dbtx, dbtx); \
-	do { if(! dbtx->impl) rb_raise(rb_eRuntimeError, "tx already committed/aborted"); } while(0)
 
 void
 rb_ptnk_cur_mark(rb_ptnk_cur* cur)
@@ -310,13 +301,34 @@ rb_ptnk_cur_free(rb_ptnk_cur* cur)
 }
 
 VALUE
+wrap_cur(ptnk::DB::Tx::cursor_t* c, VALUE vtx, VALUE vtable)
+{
+	VALUE ret;
+
+	rb_ptnk_cur* cur;
+	ret = Data_Make_Struct(RBK_cur, rb_ptnk_cur, rb_ptnk_cur_mark, rb_ptnk_cur_free, cur);
+	cur->vtx = vtx;
+	cur->vtable = vtable;
+	cur->impl = c;
+
+	return ret;
+}
+#define GET_CUR_WRAP(VAL) \
+	rb_ptnk_cur* cur; \
+	Data_Get_Struct(VAL, rb_ptnk_cur, cur); \
+	if(! cur->impl) rb_raise(rb_eArgError, "cursor already freed"); \
+	rb_ptnk_dbtx* dbtx; \
+	Data_Get_Struct(cur->vtx, rb_ptnk_dbtx, dbtx); \
+	do { if(! dbtx->impl) rb_raise(rb_eRuntimeError, "tx already committed/aborted"); } while(0)
+
+VALUE
 cur_get(VALUE self)
 {
 	GET_CUR_WRAP(self);
 
 	VALUE ret = rb_ary_new();
 
-	Buffer k, v;
+	ptnk::Buffer k, v;
 	dbtx->impl->curGet(&k, &v, cur->impl);
 
 	rb_ary_push(ret, cref2val(k.rref()));
@@ -352,15 +364,41 @@ dbtx_cursor_front(VALUE self, VALUE vtable)
 		return Qnil;
 	}
 
-	VALUE ret;
+	return wrap_cur(c, self, vtable);
+}
 
-	rb_ptnk_cur* cur;
-	ret = Data_Make_Struct(RBK_cur, rb_ptnk_cur, rb_ptnk_cur_mark, rb_ptnk_cur_free, cur);
-	cur->vtx = self;
-	cur->vtable = vtable;
-	cur->impl = c;
+VALUE
+dbtx_cursor_query(int argc, VALUE* argv, VALUE self)
+{
+	VALUE tmp;
 
-	return ret;
+	ptnk::query_t q;
+	switch(argc)
+	{
+	case 3:
+		q.type = static_cast<ptnk::query_type_t>(FIX2INT(argv[2]));
+		/* FALL THROUGH */
+
+	case 2:
+		q.key = val2cref(argv[1], &tmp);
+		break;
+
+	case 1:
+	case 0:
+		rb_raise(rb_eArgError, "not enough args (accept 2 or 3");
+
+	default:
+		rb_raise(rb_eArgError, "too many args");
+	}
+	VALUE vtable = argv[0];
+	GET_TABLE_WRAP(vtable);
+
+	GET_DBTX_WRAP;
+
+	ptnk::DB::Tx::cursor_t* c = dbtx->impl->curQuery(table->impl, q);
+	if(! c) return Qnil;
+
+	return wrap_cur(c, self, vtable);
 }
 
 void
@@ -388,6 +426,7 @@ Init_ptnk()
 	rb_define_method(RBK_cur, "next", (ruby_method_t)cur_next, 0);
 
 	rb_define_method(RBK_dbtx, "cursor_front", (ruby_method_t)dbtx_cursor_front, 1);
+	rb_define_method(RBK_dbtx, "cursor_query", (ruby_method_t)dbtx_cursor_query, -1);
 }
 
 } // extern "C"
