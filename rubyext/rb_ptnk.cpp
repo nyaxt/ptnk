@@ -263,21 +263,134 @@ rb_ptnk_table_free(rb_ptnk_table* table)
 }
 
 VALUE
+wrap_table(ptnk::TableOffCache* t)
+{
+	rb_ptnk_table* table;
+	VALUE ret = Data_Make_Struct(RBK_table, rb_ptnk_table, 0, rb_ptnk_table_free, table);
+
+	table->impl = t;
+
+	return ret;
+}
+
+VALUE
 table_new(VALUE klass, VALUE vtableid)
 {
 	VALUE tmp;
-	rb_ptnk_table* table;
-	VALUE ret = Data_Make_Struct(klass, rb_ptnk_table, 0, rb_ptnk_table_free, table);
 
-	table->impl = new ptnk::TableOffCache(val2cref(vtableid, &tmp));
-
-	return ret;
+	return wrap_table(new ptnk::TableOffCache(val2cref(vtableid, &tmp)));
 }
 #define GET_TABLE_WRAP(VAL) \
 	if(! rb_obj_is_kind_of(VAL, RBK_table)) rb_raise(rb_eArgError, "arg must be Ptnk::Table"); \
 	rb_ptnk_table* table; \
 	Data_Get_Struct(VAL, rb_ptnk_table, table); \
 	if(! table->impl) rb_raise(rb_eArgError, "table already freed");
+
+VALUE
+dbtx_table_create(VALUE self, VALUE vtableid)
+{
+	GET_DBTX_WRAP;
+
+	VALUE tmp;
+	ptnk::BufferCRef tableid = val2cref(vtableid, &tmp);
+	dbtx->impl->tableCreate(tableid);
+	
+	return wrap_table(new ptnk::TableOffCache(tableid));
+}
+
+VALUE
+dbtx_table_drop(VALUE self, VALUE vtableid)
+{
+	GET_DBTX_WRAP;
+
+	VALUE tmp;
+	dbtx->impl->tableDrop(val2cref(vtableid, &tmp));
+	
+	return Qnil;
+}
+
+VALUE
+dbtx_get(int argc, VALUE* argv, VALUE self)
+{
+	VALUE vtable = Qnil, vkey;
+	switch(argc)
+	{
+	case 2:
+		vtable = argv[0]; argv++;
+		/* fall through */
+
+	case 1:
+		vkey = argv[0];
+		break;
+
+	default:
+		rb_raise(rb_eArgError, "invalid number of args");
+	}
+
+	GET_DBTX_WRAP;
+	
+	ptnk::Buffer val;
+	VALUE tmp;
+	if(! NIL_P(vtable))
+	{
+		// record get from specified table
+
+		GET_TABLE_WRAP(vtable);
+		
+		dbtx->impl->get(table->impl, val2cref(vkey, &tmp), &val);
+	}
+	else
+	{
+		// record get from default table
+
+		dbtx->impl->get(val2cref(vkey, &tmp), &val);
+	}
+
+	return cref2val(val.rref());
+}
+
+VALUE
+dbtx_put(int argc, VALUE* argv, VALUE self)
+{
+	ptnk::put_mode_t pm;
+
+	VALUE vtable = Qnil, vkey, vval;
+	switch(argc)
+	{
+	case 4:
+		vtable = argv[0]; argv++;
+		/* fall through */
+
+	case 3:
+		vkey = argv[0];
+		vval = argv[1];
+		pm = static_cast<ptnk::put_mode_t>(FIX2INT(argv[2]));
+		break;
+
+	default:
+		rb_raise(rb_eArgError, "invalid number of args");
+	}
+
+	GET_DBTX_WRAP;
+	
+	VALUE tmp, tmp2;
+	if(! NIL_P(vtable))
+	{
+		// record put to specified table
+
+		GET_TABLE_WRAP(vtable);
+		
+		dbtx->impl->put(table->impl, val2cref(vkey, &tmp), val2cref(vval, &tmp2), pm);
+	}
+	else
+	{
+		// record put to default table
+
+		dbtx->impl->put(val2cref(vkey, &tmp), val2cref(vval, &tmp2), pm);
+	}
+
+	return Qnil;
+}
 
 struct rb_ptnk_cur
 {
@@ -413,13 +526,19 @@ Init_ptnk()
 
 	RBK_dbtx = rb_define_class_under(RBK_db, "Tx", rb_cObject);
 	rb_define_singleton_method(RBK_dbtx, "new", (ruby_method_t)dbtx_new, 1);
-	rb_define_method(RBK_dbtx, "try_commit", (ruby_method_t)dbtx_try_commit, -1);
-	rb_define_method(RBK_dbtx, "abort", (ruby_method_t)dbtx_abort, 0);
+	rb_define_method(RBK_dbtx, "try_commit!", (ruby_method_t)dbtx_try_commit, -1);
+	rb_define_method(RBK_dbtx, "abort!", (ruby_method_t)dbtx_abort, 0);
 
 	rb_define_method(RBK_dbtx, "table_get_names", (ruby_method_t)dbtx_table_get_names, 0);
 
 	RBK_table = rb_define_class_under(RBM_ptnk, "Table", rb_cObject);
 	rb_define_singleton_method(RBK_table, "new", (ruby_method_t)table_new, 1);
+
+	rb_define_method(RBK_dbtx, "table_create", (ruby_method_t)dbtx_table_create, 1);
+	rb_define_method(RBK_dbtx, "table_drop", (ruby_method_t)dbtx_table_drop, 1);
+
+	rb_define_method(RBK_dbtx, "get", (ruby_method_t)dbtx_get, -1);
+	rb_define_method(RBK_dbtx, "put", (ruby_method_t)dbtx_put, -1);
 
 	RBK_cur = rb_define_class_under(RBK_dbtx, "Cursor", rb_cObject);
 	rb_define_method(RBK_cur, "get", (ruby_method_t)cur_get, 0);
