@@ -326,10 +326,31 @@ cur_get(VALUE self)
 }
 
 VALUE
+cur_next(VALUE self)
+{
+	GET_CUR_WRAP(self);
+
+	if(dbtx->impl->curNext(cur->impl))
+	{
+		return self;	
+	}
+	else
+	{
+		return Qnil;
+	}
+}
+
+VALUE
 dbtx_cursor_front(VALUE self, VALUE vtable)
 {
 	GET_DBTX_WRAP;
 	GET_TABLE_WRAP(vtable);
+
+	ptnk::DB::Tx::cursor_t* c = dbtx->impl->curFront(table->impl);
+	if(! c)
+	{
+		return Qnil;
+	}
 
 	VALUE ret;
 
@@ -337,7 +358,7 @@ dbtx_cursor_front(VALUE self, VALUE vtable)
 	ret = Data_Make_Struct(RBK_cur, rb_ptnk_cur, rb_ptnk_cur_mark, rb_ptnk_cur_free, cur);
 	cur->vtx = self;
 	cur->vtable = vtable;
-	cur->impl = dbtx->impl->curFront(table->impl);
+	cur->impl = c;
 
 	return ret;
 }
@@ -364,6 +385,7 @@ Init_ptnk()
 
 	RBK_cur = rb_define_class_under(RBK_dbtx, "Cursor", rb_cObject);
 	rb_define_method(RBK_cur, "get", (ruby_method_t)cur_get, 0);
+	rb_define_method(RBK_cur, "next", (ruby_method_t)cur_next, 0);
 
 	rb_define_method(RBK_dbtx, "cursor_front", (ruby_method_t)dbtx_cursor_front, 1);
 }
