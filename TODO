@@ -1,4 +1,4 @@
-- add warnings to TableOffCache
+- documentation: add warnings to TableOffCache
   - can be reused across transactions, but can't be shared by two or more concurrent transactions.
 
 - ptnk_bindump seems to be broken
@@ -20,7 +20,8 @@
 - DupKeyLeaf::curUpdate impl.
 
 mysql storage engine known bugs:
-- db filename is weird 
+- entire db is lost at unknown timing
+- TPC-C fails to run
 
 ptnk known issues list:
 

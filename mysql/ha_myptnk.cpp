@@ -786,12 +786,12 @@ ha_myptnk::pack_key_from_mysqlkey(KEY* key, char* dest, size_t* szDest, const uc
 			DEBUG_OUTF("null_bit byte: %d\n", *keyd);
 			if(*keyd++ == 0)
 			{
-				*p++ = 0;
+				*p++ = 1;
 			}
 			else
 			{
 				// key null
-				*p++ = 1;
+				*p++ = 0;
 				keyd += key_part->store_length;
 				continue;
 			}
@@ -1134,9 +1134,22 @@ ha_myptnk::rnd_next(uchar *buf)
 			MYSQL_READ_ROW_DONE(rc);
 			DBUG_RETURN(rc);
 		}
+		
+		if(pkey.dsize < 0)
+		{
+			rc = HA_ERR_END_OF_FILE;
+			MYSQL_READ_ROW_DONE(rc);
+			DBUG_RETURN(rc);
+		}
 
 		// -- query main table
 		value = ::ptnk_tx_table_get(m_txn->ptnktx, m_ptnktable, pkey);
+		if(value.dsize < 0)
+		{
+			rc = HA_ERR_INTERNAL_ERROR;
+			MYSQL_READ_ROW_DONE(rc);
+			DBUG_RETURN(rc);
+		}
 	}
 
 	DEBUG_OUTF("value.dsize: %d\n", value.dsize);

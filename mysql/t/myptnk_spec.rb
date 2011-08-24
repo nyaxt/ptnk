@@ -207,6 +207,7 @@ describe "MyPTNK" do
       q %Q{insert into r values (#{x}, '#{x}')}
     end
 
+    q "drop procedure if exists curfirst"
     q <<-END
       create procedure curfirst(out tk int, out tv varchar(8))
       begin
@@ -221,6 +222,7 @@ describe "MyPTNK" do
     q "call curfirst(@k, @v)"
     q("select @k, @v").first.should eq({:@k => 0, :@v => '0'})
 
+    q "drop procedure if exists cursecond"
     q <<-END
       create procedure cursecond(out tk int, out tv varchar(8))
       begin
@@ -235,6 +237,33 @@ describe "MyPTNK" do
 
     q "call cursecond(@k, @v)"
     q("select @k, @v").first.should eq({:@k => 1, :@v => '1'})
+  end
+
+  it "should be able to handle TPC-C customer like table" do
+    q "drop table if exists customer"
+    q <<-END
+      create table customer (
+        c_id int not null, 
+        c_d_id tinyint not null,
+        c_w_id smallint not null, 
+        c_first varchar(16), 
+        c_middle char(2), 
+        c_last varchar(16), 
+        CONSTRAINT pkey_customer PRIMARY KEY(c_w_id, c_d_id, c_id),
+        KEY idx_customer (c_w_id,c_d_id,c_last,c_first)
+      ) ENGINE=myptnk;
+    END
+
+    q("select * from customer").count.should eq(0)
+
+    q("insert into customer values (3, 2, 1, 'Homura', 'qb', 'Akemi')")
+    q("insert into customer values (4, 2, 1, 'Madoka', 'qb', 'Kaname')")
+
+    q("select * from customer").count.should eq(2)
+
+    r = q("select * from customer use index (idx_customer) where c_w_id = 1 and c_d_id = 2 and c_last = 'Akemi'")
+    r.count.should eq(1)
+    r.first.should eq({c_id: 3, c_d_id: 2, c_w_id: 1, c_first: 'Homura', c_middle: 'qb', c_last: 'Akemi'})
   end
 
 end

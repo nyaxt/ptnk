@@ -2693,6 +2693,8 @@ btree_cursor_root(btree_cursor_t* cur)
 void
 btree_query(btree_cursor_t* cur, page_id_t pgidRoot, const query_t& query, PageIO* pio)
 {
+	PTNK_ASSERT(query.isValid());
+
 	cur->reset();
 
 	Page pg = pio->readPage(pgidRoot);

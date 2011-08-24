@@ -1,5 +1,4 @@
-$: << "../rubyext/"
-require 'ptnk'
+require_relative "../rubyext/ptnk"
 
 db = Ptnk::DB.new(ARGV[0] || '')
 tx = Ptnk::DB::Tx.new(db)
