@@ -266,4 +266,26 @@ describe "MyPTNK" do
     r.first.should eq({c_id: 3, c_d_id: 2, c_w_id: 1, c_first: 'Homura', c_middle: 'qb', c_last: 'Akemi'})
   end
 
+  it "should be able to handle tiny and short as idx" do
+    q "drop table if exists ts"
+    q <<-END
+      create table ts (
+        t tiny not null,
+        s short not null,
+        primary key (t, s)
+      ) ENGINE=myptnk;
+    END
+
+    q "insert into ts values (111, 12345)"
+    q "insert into ts values (222, 4321)"
+
+    r = q("select * from ts")
+    r.count.should eq(2)
+    r.to_a.should eq([{t: 111, s:12345}, {t:222, s:4321}])
+
+    r = q("select * from ts where t = 222 and s = 4321")
+    r.count.should eq(1)
+    r.first.should eq([{t:222, s:4321}])
+  end
+
 end
