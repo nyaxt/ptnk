@@ -10,6 +10,7 @@
 extern "C"
 {
 
+typedef VALUE (*ruby_method_t)(...);
 void Init_ptnk();
 
 VALUE RBM_ptnk = Qnil;
@@ -38,6 +39,7 @@ val2cref(VALUE val, VALUE* tmp)
 	}
 }
 
+inline
 VALUE
 cref2val(const ptnk::BufferCRef& buf)
 {
@@ -77,7 +79,7 @@ db_new(int argc, VALUE* argv, VALUE klass)
 	VALUE ret;
 
 	rb_ptnk_db* db;
-	ret = Data_Make_Struct(klass, rb_ptnk_db, 0, rb_ptnk_db_free, db);
+	ret = Data_Make_Struct(klass, rb_ptnk_db, NULL, rb_ptnk_db_free, db);
 
 	const char* filename = "";
 	ptnk_opts_t opts = ptnk::ODEFAULT;
@@ -101,16 +103,29 @@ db_new(int argc, VALUE* argv, VALUE klass)
 
 	return ret;
 }
-#define GET_DB_WRAP \
-	rb_ptnk_db* db; \
-	Data_Get_Struct(self, rb_ptnk_db, db);
 
-typedef VALUE (*ruby_method_t)(...);
+VALUE
+db_close(VALUE self)
+{
+	rb_ptnk_db* db;
+	Data_Get_Struct(self, rb_ptnk_db, db);
+	if(db->impl)
+	{
+		delete db->impl;
+		db->impl = NULL;	
+	}
+
+	return Qnil;
+}
+#define GET_DB_WRAP(VDB) \
+	rb_ptnk_db* db; \
+	Data_Get_Struct(VDB, rb_ptnk_db, db); \
+	if(! db->impl) rb_raise(rb_eRuntimeError, "db is closed");
 
 VALUE
 db_get(VALUE self, VALUE key)
 {
-	GET_DB_WRAP;
+	GET_DB_WRAP(self);
 
 	VALUE ret = rb_str_buf_new(2048);
 
@@ -140,7 +155,7 @@ db_put(int argc, VALUE* argv, VALUE self)
 		rb_raise(rb_eArgError, "only 1 arg given");	
 	}
 
-	GET_DB_WRAP;
+	GET_DB_WRAP(self);
 
 	ptnk::put_mode_t pm = ptnk::PUT_UPDATE;
 	if(argc > 3)
@@ -156,8 +171,16 @@ db_put(int argc, VALUE* argv, VALUE self)
 
 struct rb_ptnk_dbtx
 {
+	VALUE vdb;
 	ptnk::DB::Tx* impl;
 };
+
+void
+rb_ptnk_dbtx_mark(rb_ptnk_dbtx* dbtx)
+{
+	// mark DB ruby obj to avoid db being gc-ed while tx is active
+	rb_gc_mark(dbtx->vdb);
+}
 
 void
 rb_ptnk_dbtx_free(rb_ptnk_dbtx* dbtx)
@@ -178,20 +201,23 @@ dbtx_new(VALUE klass, VALUE vdb)
 	{
 		rb_raise(rb_eArgError, "non Ptnk::DB passed to Ptnk::DB::Tx.new");	
 	}
-	rb_ptnk_db* db;
-	Data_Get_Struct(vdb, rb_ptnk_db, db);
+	GET_DB_WRAP(vdb);
 
 	rb_ptnk_dbtx* dbtx;
-	ret = Data_Make_Struct(klass, rb_ptnk_dbtx, 0, rb_ptnk_dbtx_free, dbtx);
+	ret = Data_Make_Struct(klass, rb_ptnk_dbtx, rb_ptnk_dbtx_mark, rb_ptnk_dbtx_free, dbtx);
 
 	dbtx->impl = db->impl->newTransaction();
+	dbtx->vdb = vdb;
 
 	return ret;
 }
 #define GET_DBTX_WRAP \
 	rb_ptnk_dbtx* dbtx; \
 	Data_Get_Struct(self, rb_ptnk_dbtx, dbtx); \
-	do { if(! dbtx->impl) rb_raise(rb_eRuntimeError, "tx already committed/aborted"); } while(0)
+	do { \
+		if(! dbtx->impl) rb_raise(rb_eRuntimeError, "tx already committed/aborted"); \
+		GET_DB_WRAP(dbtx->vdb); /* assert db open */ \
+	} while(0)
 
 VALUE
 dbtx_try_commit(int argc, VALUE* argv, VALUE self)
@@ -207,12 +233,15 @@ dbtx_try_commit(int argc, VALUE* argv, VALUE self)
 	}
 
 	// try commit
+	bool bSuccess = false;
 	if(bCommit)
 	{
-		dbtx->impl->tryCommit();
+		bSuccess = dbtx->impl->tryCommit();
 	}
 	delete dbtx->impl;
 	dbtx->impl = NULL;
+
+	return bSuccess ? Qtrue : Qfalse;
 }
 
 VALUE
@@ -518,9 +547,28 @@ void
 Init_ptnk()
 {
 	RBM_ptnk = rb_define_module("Ptnk");
+	#define WRAP_CONST(C) rb_define_const(RBM_ptnk, #C, INT2FIX(ptnk::C));
+	WRAP_CONST(OWRITER);
+	WRAP_CONST(OCREATE);
+	WRAP_CONST(OTRUNCATE);
+	WRAP_CONST(OAUTOSYNC);
+	WRAP_CONST(OPARTITIONED);
+	WRAP_CONST(ODEFAULT);
+	WRAP_CONST(PUT_INSERT);
+	WRAP_CONST(PUT_UPDATE);
+	WRAP_CONST(PUT_LEAVE_EXISTING);
+	WRAP_CONST(MATCH_EXACT);
+	WRAP_CONST(MATCH_OR_PREV);
+	WRAP_CONST(MATCH_OR_NEXT);
+	WRAP_CONST(BEFORE);
+	WRAP_CONST(AFTER);
+	WRAP_CONST(FRONT);
+	WRAP_CONST(BACK);
+
 	RBK_db = rb_define_class_under(RBM_ptnk, "DB", rb_cObject);
 	
 	rb_define_singleton_method(RBK_db, "new", (ruby_method_t)db_new, -1);
+	rb_define_method(RBK_db, "close", (ruby_method_t)db_close, 0);
 	rb_define_method(RBK_db, "get", (ruby_method_t)db_get, 1);
 	rb_define_method(RBK_db, "put", (ruby_method_t)db_put, -1);
 
