@@ -2260,6 +2260,43 @@ TEST(ptnk, btree_cursor_put)
 	}
 }
 
+TEST(ptnk, btree_nonexact_query)
+{
+	boost::scoped_ptr<PageIO> pio(new PageIOMem);
+
+	page_id_t idRoot = btree_init(pio.get());
+
+	const int COUNT = 40;
+	for(int i = 0; i < COUNT; ++ i)
+	{
+		char key[8]; sprintf(key, "%08d", i*10);
+		char val[128]; sprintf(val, "%08d=======================================================================================================================", i);
+
+		idRoot = btree_put(idRoot, cstr2ref(key), cstr2ref(val), PUT_INSERT, PGID_INVALID, pio.get());
+	}
+
+	Buffer k, v;
+
+	btree_cursor_wrap cur;
+	for(int i = 0; i < COUNT; ++ i)
+	{
+		char key[8]; sprintf(key, "%08d", i*10-5);
+		char val[128]; sprintf(val, "%08d=======================================================================================================================", i);
+
+		query_t q = {cstr2ref(key), MATCH_OR_NEXT};
+		btree_query(cur.get(), idRoot, q, pio.get());
+
+		btree_cursor_get(k.wref(), k.pvalsize(), v.wref(), v.pvalsize(), cur.get(), pio.get());
+		k.makeNullTerm(); v.makeNullTerm();
+
+		sprintf(key, "%08d", i*10);
+		EXPECT_TRUE(k.isValid()) << "i: " << i;
+		EXPECT_STREQ(key, k.get()) << "i: " << i;
+		EXPECT_TRUE(v.isValid()) << "i: " << i;
+		EXPECT_STREQ(val, v.get()) << "i: " << i;
+	}
+}
+
 TEST(ptnk, OverviewPage)
 {
 	boost::scoped_ptr<PageIO> pio(new PageIOMem);
