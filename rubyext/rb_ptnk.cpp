@@ -17,6 +17,8 @@ void Init_ptnk();
 VALUE RBM_ptnk = Qnil;
 VALUE RBK_db = Qnil;
 VALUE RBK_dbtx = Qnil;
+VALUE RBK_table = Qnil;
+VALUE RBK_cur = Qnil;
 
 inline
 BufferCRef
@@ -38,6 +40,24 @@ val2cref(VALUE val, VALUE* tmp)
 	}
 }
 
+VALUE
+cref2val(const BufferCRef& buf)
+{
+	if(buf.isNull())
+	{
+		return Qnil;	
+	}
+	else if(buf.isValid())
+	{
+		return rb_str_new(buf.get(), buf.size());
+	}
+	else
+	{
+		// value not found
+		return Qfalse;	
+	}
+}
+
 struct rb_ptnk_db
 {
 	ptnk::DB* impl;
@@ -50,6 +70,7 @@ rb_ptnk_db_free(rb_ptnk_db* db)
 	{
 		delete db->impl;
 	}
+	db->impl = NULL;
 }
 
 VALUE
@@ -147,6 +168,7 @@ rb_ptnk_dbtx_free(rb_ptnk_dbtx* dbtx)
 	{
 		delete dbtx->impl;
 	}
+	dbtx->impl = NULL;
 }
 
 VALUE
@@ -172,29 +194,6 @@ dbtx_new(VALUE klass, VALUE vdb)
 	rb_ptnk_dbtx* dbtx; \
 	Data_Get_Struct(self, rb_ptnk_dbtx, dbtx); \
 	do { if(! dbtx->impl) rb_raise(rb_eRuntimeError, "tx already committed/aborted"); } while(0)
-
-VALUE
-dbtx_table_get_names(VALUE self)
-{
-	GET_DBTX_WRAP;
-
-	VALUE ret, vname;
-	ret = rb_ary_new();
-
-	for(int i = 0;; ++ i)
-	{
-		Buffer name;
-		dbtx->impl->tableGetName(i, &name);
-
-		if(! name.isValid()) break;
-
-		vname = rb_str_new(name.get(), name.valsize());
-
-		rb_ary_push(ret, vname);
-	}
-
-	return ret;
-}
 
 VALUE
 dbtx_try_commit(int argc, VALUE* argv, VALUE self)
@@ -227,6 +226,122 @@ dbtx_abort(VALUE self)
 	dbtx->impl = NULL;
 }
 
+VALUE
+dbtx_table_get_names(VALUE self)
+{
+	GET_DBTX_WRAP;
+
+	VALUE ret, vname;
+	ret = rb_ary_new();
+
+	for(int i = 0;; ++ i)
+	{
+		Buffer name;
+		dbtx->impl->tableGetName(i, &name);
+
+		if(! name.isValid()) break;
+
+		vname = rb_str_new(name.get(), name.valsize());
+
+		rb_ary_push(ret, vname);
+	}
+
+	return ret;
+}
+
+struct rb_ptnk_table
+{
+	ptnk::TableOffCache* impl;
+};
+
+void
+rb_ptnk_table_free(rb_ptnk_table* table)
+{
+	if(table->impl)
+	{
+		delete table->impl;
+	}
+	table->impl = NULL;
+}
+
+VALUE
+table_new(VALUE klass, VALUE vtableid)
+{
+	VALUE tmp;
+	rb_ptnk_table* table;
+	VALUE ret = Data_Make_Struct(klass, rb_ptnk_table, 0, rb_ptnk_table_free, table);
+
+	table->impl = new TableOffCache(val2cref(vtableid, &tmp));
+
+	return ret;
+}
+#define GET_TABLE_WRAP(VAL) \
+	if(! rb_obj_is_kind_of(vtable, RBK_table)) rb_raise(rb_eArgError, "arg must be Ptnk::Table"); \
+	rb_ptnk_table* table; \
+	Data_Get_Struct(VAL, rb_ptnk_table, table); \
+	if(! table->impl) rb_raise(rb_eArgError, "table already freed");
+
+struct rb_ptnk_cur
+{
+	VALUE vtx;
+	VALUE vtable;
+	ptnk::DB::Tx::cursor_t* impl;
+};
+#define GET_CUR_WRAP(VAL) \
+	rb_ptnk_cur* cur; \
+	Data_Get_Struct(VAL, rb_ptnk_cur, cur); \
+	if(! cur->impl) rb_raise(rb_eArgError, "cursor already freed"); \
+	rb_ptnk_dbtx* dbtx; \
+	Data_Get_Struct(cur->vtx, rb_ptnk_dbtx, dbtx); \
+	do { if(! dbtx->impl) rb_raise(rb_eRuntimeError, "tx already committed/aborted"); } while(0)
+
+void
+rb_ptnk_cur_mark(rb_ptnk_cur* cur)
+{
+	rb_gc_mark(cur->vtx);
+	rb_gc_mark(cur->vtable);
+}
+
+void
+rb_ptnk_cur_free(rb_ptnk_cur* cur)
+{
+	ptnk::DB::Tx::curClose(cur->impl);
+	cur->impl = NULL;
+}
+
+VALUE
+cur_get(VALUE self)
+{
+	GET_CUR_WRAP(self);
+
+	VALUE ret = rb_ary_new();
+
+	Buffer k, v;
+	dbtx->impl->curGet(&k, &v, cur->impl);
+
+	rb_ary_push(ret, cref2val(k.rref()));
+	rb_ary_push(ret, cref2val(v.rref()));
+
+	return ret;
+}
+
+VALUE
+dbtx_cursor_front(VALUE self, VALUE vtable)
+{
+	GET_DBTX_WRAP;
+	GET_TABLE_WRAP(vtable);
+
+	VALUE ret;
+
+	rb_ptnk_cur* cur;
+	ret = Data_Make_Struct(RBK_cur, rb_ptnk_cur, rb_ptnk_cur_mark, rb_ptnk_cur_free, cur);
+	cur->vtx = self;
+	cur->vtable = vtable;
+	cur->impl = dbtx->impl->curFront(table->impl);
+
+	return ret;
+}
+
 void
 Init_ptnk()
 {
@@ -239,9 +354,18 @@ Init_ptnk()
 
 	RBK_dbtx = rb_define_class_under(RBK_db, "Tx", rb_cObject);
 	rb_define_singleton_method(RBK_dbtx, "new", (ruby_method_t)dbtx_new, 1);
-	rb_define_method(RBK_dbtx, "table_get_names", (ruby_method_t)dbtx_table_get_names, 0);
 	rb_define_method(RBK_dbtx, "try_commit", (ruby_method_t)dbtx_try_commit, -1);
 	rb_define_method(RBK_dbtx, "abort", (ruby_method_t)dbtx_abort, 0);
+
+	rb_define_method(RBK_dbtx, "table_get_names", (ruby_method_t)dbtx_table_get_names, 0);
+
+	RBK_table = rb_define_class_under(RBM_ptnk, "Table", rb_cObject);
+	rb_define_singleton_method(RBK_table, "new", (ruby_method_t)table_new, 1);
+
+	RBK_cur = rb_define_class_under(RBK_dbtx, "Cursor", rb_cObject);
+	rb_define_method(RBK_cur, "get", (ruby_method_t)cur_get, 0);
+
+	rb_define_method(RBK_dbtx, "cursor_front", (ruby_method_t)dbtx_cursor_front, 1);
 }
 
 } // extern "C"
