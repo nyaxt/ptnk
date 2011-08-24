@@ -453,12 +453,14 @@ ha_myptnk::pack_key_from_mysqlrow(KEY* key, uchar *buf, char* dest)
 			KEY_PART_INFO* key_part	= &key->key_part[i];
 			if(key_part->null_bit)
 			{
-				if(buf[key_part->null_offset])
+				if(buf[key_part->null_offset] & key_part->null_bit)
 				{
+					// key_part is NULL
 					*p++ = 0;
 				}
 				else
 				{
+					// key_part is non NULL
 					*p++ = 1;
 				}
 			}

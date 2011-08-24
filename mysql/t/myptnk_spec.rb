@@ -270,22 +270,22 @@ describe "MyPTNK" do
     q "drop table if exists ts"
     q <<-END
       create table ts (
-        t tiny not null,
-        s short not null,
+        t tinyint not null,
+        s smallint not null,
         primary key (t, s)
       ) ENGINE=myptnk;
     END
 
     q "insert into ts values (111, 12345)"
-    q "insert into ts values (222, 4321)"
+    q "insert into ts values (22, 4321)"
 
     r = q("select * from ts")
     r.count.should eq(2)
-    r.to_a.should eq([{t: 111, s:12345}, {t:222, s:4321}])
+    r.to_a.should eq([{t:22, s:4321}, {t: 111, s:12345}])
 
-    r = q("select * from ts where t = 222 and s = 4321")
+    r = q("select * from ts where t = 22 and s = 4321")
     r.count.should eq(1)
-    r.first.should eq([{t:222, s:4321}])
+    r.first.should eq({t:22, s:4321})
   end
 
 end
