@@ -1109,6 +1109,57 @@ Leaf::query(btree_cursor_t* cursor, const query_t& q) const
 }
 
 void
+Leaf::queryNormalized(btree_cursor_t* cur, const query_t& q, PageIO* pio) const
+{
+	query(cur, q);
+
+	int i = cur->idx;
+	PTNK_ASSERT(i != btree_cursor_t::SEE_DUPKEY_OFFSET);
+	if(PTNK_UNLIKELY(i == btree_cursor_t::NO_MATCH)) return;
+
+	if(PTNK_UNLIKELY(i >= numKVs()))
+	{
+		// normalize the cursor pointing to the leaf just after current leaf
+		if(! btree_cursor_nextleaf(cur, pio))
+		{
+			// no leaf exist after current leaf
+			cur->idx = btree_cursor_t::NO_MATCH;
+			return;
+		}
+
+		if(cur->leaf.pageType() == PT_LEAF)
+		{
+			cur->idx = 0; // first record in the leaf
+		}
+		else
+		{
+			cur->idx = btree_cursor_t::SEE_DUPKEY_OFFSET;
+			dktree_cursor_front(cur, pio);
+		}
+	}
+	else if (PTNK_UNLIKELY(i < 0))
+	{
+		// normalize the cursor pointing to the leaf just before current leaf
+		if(! btree_cursor_prevleaf(cur, pio))
+		{
+			// no leaf exist after current leaf
+			cur->idx = btree_cursor_t::NO_MATCH;
+			return;
+		}
+
+		if(cur->leaf.pageType() == PT_LEAF)
+		{
+			cur->idx = Leaf(cur->leaf).numKVs() - 1; // last record in the leaf
+		}
+		else
+		{
+			cur->idx = btree_cursor_t::SEE_DUPKEY_OFFSET;
+			dktree_cursor_back(cur, pio);
+		}
+	}
+}
+
+void
 Leaf::cursorGet(BufferRef key, ssize_t* szKey, BufferRef value, ssize_t* szValue, const btree_cursor_t& cursor) const
 {
 	PTNK_ASSERT(cursor.leaf.pageId() == pageId());
@@ -2715,7 +2766,8 @@ btree_query(btree_cursor_t* cur, page_id_t pgidRoot, const query_t& query, PageI
 			cur->leaf = pgNext;
 			if(!(query.type & F_NOQUERYLEAF))
 			{
-				Leaf(cur->leaf).query(cur, query);
+				Leaf(cur->leaf).queryNormalized(cur, query, pio);
+				// Leaf(cur->leaf).query(cur, query);
 			}
 			return;
 

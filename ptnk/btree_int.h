@@ -325,6 +325,8 @@ public:
 	void initBody();
 
 	void query(btree_cursor_t* cursor, const query_t& q) const;
+	void queryNormalized(btree_cursor_t* cur, const query_t& q, PageIO* pio) const;
+
 	void cursorGet(BufferRef key, ssize_t* szKey, BufferRef value, ssize_t* szValue, const btree_cursor_t& cursor) const;
 	ssize_t cursorGetValue(BufferRef value, const btree_cursor_t& cursor) const;
 
