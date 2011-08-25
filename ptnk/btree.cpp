@@ -349,7 +349,7 @@ Node::handleChildSplitSelfSplit(btree_split_t* split, size_t thresSplit, bool* b
 	ovr.initBody(ptrm1_);
 	for(; i < iE; ++ i)
 	{
-		if(ovr.footer().sizeFree + packedsize(kps[i].first) + sizeof(page_id_t) + sizeof(uint16_t)*2 > thresSplit) break;
+		if(ovr.footer().sizeFree + packedsize(kps[i].first) + sizeof(page_id_t) + sizeof(uint16_t)*2 < thresSplit) break;
 
 		ovr.kp_offset(i) = ovr.addKP(kps[i]);
 	}
