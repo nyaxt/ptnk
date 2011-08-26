@@ -213,8 +213,6 @@ Node::handleChildSplitNoSelfSplit(btree_split_t* split, bool* bOvr, PageIO* pio)
 Node
 Node::handleChildSplitSelfSplit(btree_split_t* split, size_t thresSplit, bool* bOvr, PageIO* pio)
 {
-	PTNK_ASSERT(footer().numKeys > 2);
-
 	const page_id_t ptrm1_ = ptrm1();
 	std::vector<kp_t> kps; kps.reserve(512);
 	int iFollow = -1; // split->pgidFollow idx in kps

@@ -29,7 +29,7 @@ PartitionedPageIO::PartitionedPageIO(const char* dbprefix, ptnk_opts_t opts, int
 	{
 		// read only access
 
-		if(m_parts.empty())
+		if(! m_active)
 		{
 			PTNK_THROW_RUNTIME_ERR("no existing dbpart file found");
 		}
@@ -88,6 +88,13 @@ PartitionedPageIO::Partition::dumpStat() const
 	{
 		std::cout << "  ! no parthandler instantiated" << std::endl;	
 	}
+}
+
+void
+PartitionedPageIO::Partition::discardFile()
+{
+	std::cerr << "discarding old partition file: " << m_filepath << std::endl;
+	PTNK_ASSURE_SYSCALL(::unlink(m_filepath.c_str()));
 }
 
 void
@@ -229,7 +236,9 @@ PartitionedPageIO::openFiles()
 			}
 
 			Partition* p;
-			m_parts.push_back(p = new Partition(partid, filepath, optsPIO, m_mode /* not used for existing file */));
+			p = new Partition(partid, filepath, optsPIO, m_mode /* not used for existing file */);
+			m_parts.replace(partid, p);
+
 			// if the part file is writable and is the newest partition, set the partition active
 			if((optsPIO & OWRITER) && m_partidLast == p->partid())
 			{
@@ -257,27 +266,10 @@ PartitionedPageIO::addNewPartition()
 		PTNK_THROW_RUNTIME_ERR("wierd! the dbfile for the new partid already exists!");	
 	}
 
-	Partition* p = new Partition(partid, filename, m_opts, m_mode); 
-	m_parts.push_back(p);
-	m_active = p;
+	Partition* p = m_active = new Partition(partid, filename, m_opts, m_mode);
+	m_parts.replace(partid, p);
 
 	return p;
-}
-
-PartitionedPageIO::Partition*
-PartitionedPageIO::part(part_id_t partid)
-{
-	// FIXME: add cache
-	
-	BOOST_FOREACH(Partition& part, m_parts)
-	{
-		if(part.partid() == partid)	
-		{
-			return &part;	
-		}
-	}
-
-	return NULL;
 }
 
 pair<Page, page_id_t>
@@ -295,21 +287,21 @@ Page
 PartitionedPageIO::readPage(page_id_t pgid)
 {
 	part_id_t partid = PGID_PARTID(pgid);
-	return part(partid)->handler()->readPage(PGID_LOCALID(pgid));
+	return m_parts[partid].handler()->readPage(PGID_LOCALID(pgid));
 }
 
 Page
 PartitionedPageIO::modifyPage(const Page& pg, mod_info_t* mod)
 {
 	part_id_t partid = PGID_PARTID(pg.pageId());
-	return part(partid)->handler()->modifyPage(pg, mod);
+	return m_parts[partid].handler()->modifyPage(pg, mod);
 }
 
 void
 PartitionedPageIO::sync(page_id_t pgid)
 {
 	part_id_t partid = PGID_PARTID(pgid);
-	return part(partid)->handler()->sync(PGID_LOCALID(pgid));
+	return m_parts[partid].handler()->sync(PGID_LOCALID(pgid));
 }
 
 void
@@ -321,13 +313,13 @@ PartitionedPageIO::syncRange(page_id_t pgidStart, page_id_t pgidEnd)
 	part_id_t partStart;
 	while(PTNK_UNLIKELY((partStart = PGID_PARTID(pgidStart)) != partEnd))
 	{
-		part(partStart)->handler()->syncRange(
+		m_parts[partStart].handler()->syncRange(
 			PGID_LOCALID(pgidStart), PTNK_LOCALID_INVALID
 			);
 		pgidStart = PGID_PARTSTART(partStart + 1);
 	}
 
-	part(partStart)->handler()->syncRange(
+	m_parts[partStart].handler()->syncRange(
 		PGID_LOCALID(pgidStart), PGID_LOCALID(pgidEnd)
 		);
 }
@@ -344,11 +336,9 @@ PartitionedPageIO::getLastPgId() const
 local_pgid_t
 PartitionedPageIO::getPartLastLocalPgId(part_id_t partid) const
 {
-	const Partition* p = part(partid);
-
-	if(p)
+	if(! m_parts.is_null(partid))
 	{
-		return PGID_LOCALID(p->handler()->getLastPgId());
+		return PGID_LOCALID(m_parts[partid].handler()->getLastPgId());
 	}
 	else
 	{
@@ -386,8 +376,21 @@ PartitionedPageIO::dumpStat() const
 	std::cout << " - partidFirst: " << m_partidFirst << " Last: " << m_partidLast << std::endl;
 	BOOST_FOREACH(const Partition& part, m_parts)
 	{
-		part.dumpStat();
+		if(&part) part.dumpStat();
 	}
+}
+
+size_t
+PartitionedPageIO::numPartitions_() const
+{
+	size_t ret = 0;	
+
+	BOOST_FOREACH(const Partition& part, m_parts)
+	{
+		if(&part) ++ ret;
+	}
+
+	return ret;
 }
 
 page_id_t
@@ -415,29 +418,16 @@ PartitionedPageIO::discardOldPages(page_id_t threshold)
 
 	part_id_t partidT = PGID_PARTID(threshold);
 
-	std::vector<Partition*> to_delete;
-	BOOST_FOREACH(Partition& part, m_parts)
+	// FIXME: won't work if partid wrap around
+	for(part_id_t id = 0; id < partidT; ++ id)
 	{
-		if(part.partid() < partidT)
-		{
-			to_delete.push_back(&part);
-		}
+		Partition& part = m_parts[id];
+		if(! &part) continue;
+
+		part.discardFile();
+		
+		m_parts.replace(id, NULL);
 	}
-
-	BOOST_FOREACH(Partition* part, to_delete)
-	{
-		discardPartition(part);
-	}
-}
-
-void
-PartitionedPageIO::discardPartition(Partition* p)
-{
-	std::string filepath = p->filepath();
-	m_parts.erase_if(ptr_match<Partition>(p));
-
-	std::cerr << "discarding old partition file: " << filepath << std::endl;
-	PTNK_ASSURE_SYSCALL(::unlink(filepath.c_str()));
 }
 
 } // end of namespace ptnk

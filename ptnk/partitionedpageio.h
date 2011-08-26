@@ -1,7 +1,7 @@
 #ifndef _ptnk_partitionedpageio_h_
 #define _ptnk_partitionedpageio_h_
 
-#include <boost/ptr_container/ptr_vector.hpp>
+#include <boost/ptr_container/ptr_array.hpp>
 #include <boost/thread.hpp>
 
 #include "pageio.h"
@@ -53,10 +53,7 @@ public:
 
 	// ====== inspection funcs for test ======
 	
-	size_t numPartitions_() const
-	{
-		return m_parts.size();	
-	}
+	size_t numPartitions_() const;
 
 private:
 	class Partition
@@ -99,6 +96,7 @@ private:
 		}
 
 		void dumpStat() const;
+		void discardFile();
 		
 	private:
 		//! instantiate PageIO to m_parthandler
@@ -119,7 +117,6 @@ private:
 		//! PageIO responsible for the partition
 		std::auto_ptr<PageIO> m_parthandler;
 	};
-	typedef boost::ptr_vector<Partition> VPPartition;
 
 	//! open partitioned db files and populate m_parts
 	void openFiles();
@@ -129,14 +126,6 @@ private:
 
 	//! discard partition and delete its file
 	void discardPartition(Partition* part);
-
-	//! find partition from part id
-	Partition* part(part_id_t partid);
-
-	const Partition* part(part_id_t partid) const
-	{
-		return const_cast<PartitionedPageIO*>(this)->part(partid);	
-	}
 
 	//! db prefix str. see C-tor param
 	std::string m_dbprefix;
@@ -149,7 +138,7 @@ private:
 
 	bool m_needInit;
 
-	VPPartition m_parts;
+	boost::ptr_array<boost::nullable<Partition>, PTNK_PARTID_MAX+1> m_parts;
 
 	//! active partition where new pages are created
 	/*!

@@ -1,7 +1,7 @@
 Ptnk ruby binding
 =================
 
-This dir contains [ruby](http://http://www.ruby-lang.org/) language binding for **ptnk** database manager.
+This dir contains [ruby](http://www.ruby-lang.org/) language binding for **ptnk** database manager.
 
 ## TODO
 * wrap C++ exceptions
