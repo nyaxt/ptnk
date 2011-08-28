@@ -3738,6 +3738,39 @@ TEST(ptnk, PageIOMem_multithread)
 	}
 }
 
+TEST(ptnk, PartitionedPageIO_multithread)
+{
+	t_mktmpdir("./_testtmp");
+	boost::scoped_ptr<PageIO> pio(new PartitionedPageIO("./_testtmp/mt", OWRITER | OCREATE | OTRUNCATE));
+	
+	const int NUM_THREAD = 10;
+	const size_t PG_PER_THREAD = 10000;
+	const size_t c = NUM_THREAD * PG_PER_THREAD;
+
+	boost::scoped_array<page_id_t> check(new page_id_t[c]);
+	boost::thread_group tg;
+	for(int i = 0; i < NUM_THREAD; ++ i)
+	{
+		tg.create_thread(alloc_pg(pio.get(), &check[i * PG_PER_THREAD], PG_PER_THREAD));
+	}
+	tg.join_all();
+
+#if 0
+	FILE* f = ::fopen("allocdump.txt", "w+");
+	for(unsigned int i = 0; i < c; ++ i)
+	{
+		::fprintf(f, "%llu\n", check[i]);
+	}
+	::fclose(f);
+#endif
+
+	std::sort(&check[0], &check[c]);
+	for(unsigned int i = 1; i < c; ++ i)
+	{
+		EXPECT_NE(check[i-1], check[i]);
+	}
+}
+
 TEST(ptnk, commit_fail_over_rebase)
 {
 	DB db;
