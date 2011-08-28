@@ -758,8 +758,7 @@ Node::refreshAllLeafPages_(void** cursor, page_id_t threshold, int numPages, pag
 	{
 		if(bc.leaf.pageId() < threshold) // not pageOrigId
 		{
-			mod_info_t mod;
-			Leaf leafNew(pio->modifyPage(bc.leaf, &mod));
+			Leaf leafNew(pio->modifyPage(bc.leaf));
 			pio->sync(leafNew);
 			PTNK_ASSERT(mod.isValid());
 			
@@ -1245,7 +1244,7 @@ Leaf::cursorGetValue(BufferRef value, const btree_cursor_t& cursor) const
 }
 
 void
-Leaf::cursorPut(btree_cursor_t* cur, BufferCRef value, btree_split_t* split, bool* bNotifyOldLink, PageIO* pio)
+Leaf::cursorPut(btree_cursor_t* cur, BufferCRef value, btree_split_t* split, bool* bOvr, PageIO* pio)
 {
 	PTNK_ASSERT(cur->leaf.pageId() == pageId());
 
@@ -1255,7 +1254,7 @@ Leaf::cursorPut(btree_cursor_t* cur, BufferCRef value, btree_split_t* split, boo
 		PTNK_THROW_RUNTIME_ERR("Leaf::cursorPut: out of idx");
 	}
 
-	Leaf ovr(pio->modifyPage(*this, bNotifyOldLink));
+	Leaf ovr(pio->modifyPage(*this, bOvr));
 	updateIdx(ovr, i, value, split, pio);
 	cur->leaf = pio->readPage(pageOrigId()); // re-read leaf
 
@@ -1334,14 +1333,14 @@ Leaf::isRoomForVAvailable(BufferCRef value) const
 }
 
 void
-Leaf::insert(BufferCRef key, BufferCRef value, btree_split_t* split, bool* bNotifyOldLink, PageIO* pio, bool bAbortOnExisting)
+Leaf::insert(BufferCRef key, BufferCRef value, btree_split_t* split, bool* bOvr, PageIO* pio, bool bAbortOnExisting)
 {
 	PTNK_ASSERT(key.isValid());
 	PTNK_ASSERT(value.isValid());
 	PTNK_ASSERT(key.size() < BODY_SIZE/2);
 	PTNK_ASSERT(value.size() < BODY_SIZE/2);
 
-	Leaf ovr(pio->modifyPage(*this, bNotifyOldLink));
+	Leaf ovr(pio->modifyPage(*this, bOvr));
 
 	// find the new kv idx
 	int new_i; bool foundExact;
@@ -1388,7 +1387,7 @@ Leaf::insert(BufferCRef key, BufferCRef value, btree_split_t* split, bool* bNoti
 			char tmpbuf[BODY_SIZE];
 			VKV kvs; kvs.reserve(numKVs() + 1);
 			#ifdef FIXME_REF
-			if(bNotifyOldLink)
+			if(*bOvr)
 			{
 				kvsRefInsert(kvs, BufferCRef::INVALID_VAL, value, new_i);
 			}
@@ -1559,12 +1558,12 @@ Leaf::updateIdx(Leaf ovr, int i, BufferCRef value, btree_split_t* split, PageIO*
 }
 
 void
-Leaf::update(BufferCRef key, BufferCRef value, btree_split_t* split, bool* bNotifyOldLink, PageIO* pio)
+Leaf::update(BufferCRef key, BufferCRef value, btree_split_t* split, bool* bOvr, PageIO* pio)
 {
 	PTNK_ASSERT(key.isValid());
 	PTNK_ASSERT(value.isValid());
 	
-	Leaf ovr(pio->modifyPage(*this, bNotifyOldLink));
+	Leaf ovr(pio->modifyPage(*this, bOvr));
 	
 	// find the matching kv pair
 	int i; bool isExact;
@@ -2090,11 +2089,11 @@ DupKeyLeaf::addValue(BufferCRef value)
 }
 
 bool
-DupKeyLeaf::insert(BufferCRef value, bool *bNotifyOldLink, PageIO* pio)
+DupKeyLeaf::insert(BufferCRef value, bool *bOvr, PageIO* pio)
 {
 	PTNK_ASSERT(value.isValid());
 
-	DupKeyLeaf ovr(pio->modifyPage(*this, bNotifyOldLink));
+	DupKeyLeaf ovr(pio->modifyPage(*this, bOvr));
 
 	size_t packedsz = value.packedsize() + sizeof(uint16_t);
 	if(packedsz > footer().sizeFree)
@@ -2110,11 +2109,11 @@ DupKeyLeaf::insert(BufferCRef value, bool *bNotifyOldLink, PageIO* pio)
 }
 
 bool
-DupKeyLeaf::update(BufferCRef value, bool* bNotifyOldLink, PageIO* pio)
+DupKeyLeaf::update(BufferCRef value, bool* bOvr, PageIO* pio)
 {
 	PTNK_ASSERT(value.isValid());
 
-	DupKeyLeaf ovr(pio->modifyPage(*this, bNotifyOldLink));
+	DupKeyLeaf ovr(pio->modifyPage(*this, bOvr));
 
 	PTNK_THROW_RUNTIME_ERR("FIXME (not implemented): DupKeyLeaf::update");
 
@@ -2122,11 +2121,11 @@ DupKeyLeaf::update(BufferCRef value, bool* bNotifyOldLink, PageIO* pio)
 }
 
 bool
-DupKeyLeaf::popValue(ptnk::mod_info_t* mod, PageIO* pio)
+DupKeyLeaf::popValue(bool* bOvr, PageIO* pio)
 {
 	if(footer().numVs == 1) return false;
 
-	DupKeyLeaf ovr(pio->modifyPage(*this, mod));
+	DupKeyLeaf ovr(pio->modifyPage(*this, bOvr));
 
 	size_t usedFront = BODY_SIZE - sizeof(footer_t) - footer().sizeFree;
 	if(PTNK_LIKELY(footer().szKey != NULL_TAG)) usedFront -= footer().szKey;
@@ -2146,7 +2145,7 @@ DupKeyLeaf::popValue(ptnk::mod_info_t* mod, PageIO* pio)
 }
 
 DupKeyNode
-DupKeyLeaf::makeTree(bool* bNotifyOldLink, PageIO* pio)
+DupKeyLeaf::makeTree(bool* bOvr, PageIO* pio)
 {
 	// - clone old leaf and remove stored key from it
 	DupKeyLeaf dlOld(pio->newInitPage<DupKeyLeaf>());
@@ -2159,7 +2158,7 @@ DupKeyLeaf::makeTree(bool* bNotifyOldLink, PageIO* pio)
 	}
 
 	// make current leaf DupKeyNode as root
-	DupKeyNode dnNewRoot(pio->modifyPage(*this, bNotifyOldLink), /* force = */ true);
+	DupKeyNode dnNewRoot(pio->modifyPage(*this, bOvr), /* force = */ true);
 	{
 		dnNewRoot.hdr()->type = PT_DUPKEYNODE;
 		dnNewRoot.initBody(key());
@@ -2352,9 +2351,9 @@ DupKeyNode::removeKey()
 }
 
 void
-DupKeyNode::insert(BufferCRef value, bool *bNotifyOldLink, PageIO* pio)
+DupKeyNode::insert(BufferCRef value, bool *bOvr, PageIO* pio)
 {
-	if(insertR(value, bNotifyOldLink, pio))
+	if(insertR(value, bOvr, pio))
 	{
 		return;			
 	}
@@ -2371,7 +2370,7 @@ DupKeyNode::insert(BufferCRef value, bool *bNotifyOldLink, PageIO* pio)
 	}
 	
 	// - create new root node as ovr
-	DupKeyNode dnNewRoot(pio->modifyPage(*this, bNotifyOldLink));
+	DupKeyNode dnNewRoot(pio->modifyPage(*this, bOvr));
 	{
 		dnNewRoot.initBody(key());	
 		dnNewRoot.header().lvl = header().lvl + 1;
@@ -2382,12 +2381,12 @@ DupKeyNode::insert(BufferCRef value, bool *bNotifyOldLink, PageIO* pio)
 		pio->sync(dnNewRoot);
 	}
 
-	bool bSuccess = dnNewRoot.insertR(value, bNotifyOldLink, pio);
+	bool bSuccess = dnNewRoot.insertR(value, bOvr, pio);
 	PTNK_ASSERT(bSuccess); (void)bSuccess; // above should always success
 }
 
 bool
-DupKeyNode::insertR(BufferCRef value, bool* bNotifyOldLink, PageIO* pio)
+DupKeyNode::insertR(BufferCRef value, bool* bOvr, PageIO* pio)
 {
 	const int nPtr = header().nPtr;
 
@@ -2410,15 +2409,15 @@ DupKeyNode::insertR(BufferCRef value, bool* bNotifyOldLink, PageIO* pio)
 			{
 				DupKeyNode dn(pio->readPage(o.ptr));
 				
-				if(! dn.insertR(value, bNotifyOldLink, pio))
+				if(! dn.insertR(value, bOvr, pio))
 				{
 					PTNK_THROW_RUNTIME_ERR("insert to free DupKeyNode failed!");
 				}
 
-				if(*bNotifyOldLink) pio->notifyPageWOldLink(pageOrigId());
+				if(*bOvr) pio->notifyPageWOldLink(pageOrigId());
 
 				// update sizeFree
-				DupKeyNode ovr(pio->modifyPage(*this, bNotifyOldLink));
+				DupKeyNode ovr(pio->modifyPage(*this, bOvr));
 				{
 					ovr.e(i).sizeFree = dn.ptrsFree();
 
@@ -2433,12 +2432,11 @@ DupKeyNode::insertR(BufferCRef value, bool* bNotifyOldLink, PageIO* pio)
 		// try inserting to the node w/ most free ptrs in the list
 		DupKeyNode dnMostFree(pio->readPage(e(iX).ptr));
 
-		mod_info_t modChild;
-		if(dnMostFree.insertR(value, bNotifyOldLink, pio))
+		if(dnMostFree.insertR(value, bOvr, pio))
 		{
 			// insert success...
 
-			if(*bNotifyOldLink) pio->notifyPageWOldLink(pageOrigId());
+			if(*bOvr) pio->notifyPageWOldLink(pageOrigId());
 
 			return true;
 		}
@@ -2449,12 +2447,12 @@ DupKeyNode::insertR(BufferCRef value, bool* bNotifyOldLink, PageIO* pio)
 			DupKeyNode dnNew(pio->newInitPage<DupKeyNode>());
 			dnNew.initBody(BufferCRef::INVALID_VAL); // don't store key to non-root node
 
-			bool bSuccess = dnNew.insertR(value, bNotifyOldLink, pio);
+			bool bSuccess = dnNew.insertR(value, bOvr, pio);
 			PTNK_ASSERT(bSuccess); (void)bSuccess; // above should never fail
 
-			if(*bNotifyOldLink) pio->notifyPageWOldLink(pageOrigId());
+			if(*bOvr) pio->notifyPageWOldLink(pageOrigId());
 
-			DupKeyNode ovr(pio->modifyPage(*this, bNotifyOldLink));
+			DupKeyNode ovr(pio->modifyPage(*this, bOvr));
 			{
 				ovr.e(iX).sizeFree = dnMostFree.ptrsFree();
 				ovr.e(nPtr).ptr = dnNew.pageId();
@@ -2493,12 +2491,12 @@ DupKeyNode::insertR(BufferCRef value, bool* bNotifyOldLink, PageIO* pio)
 			{
 				DupKeyLeaf dl(pio->readPage(o.ptr));
 
-				bool bSuccess = dl.insert(value, bNotifyOldLink, pio);
+				bool bSuccess = dl.insert(value, bOvr, pio);
 				PTNK_ASSERT(bSuccess); (void)bSuccess; // above should never fail
 
-				if(*bNotifyOldLink) pio->notifyPageWOldLink(pageOrigId());
+				if(*bOvr) pio->notifyPageWOldLink(pageOrigId());
 
-				DupKeyNode ovr(pio->modifyPage(*this, bNotifyOldLink));
+				DupKeyNode ovr(pio->modifyPage(*this, bOvr));
 				{
 					ovr.e(i).sizeFree = dl.sizeFree();
 
@@ -2519,10 +2517,9 @@ DupKeyNode::insertR(BufferCRef value, bool* bNotifyOldLink, PageIO* pio)
 		// try inserting to the leaf w/ most free space in the list
 		DupKeyLeaf dlMostFree(pio->readPage(e(iX).ptr));
 
-		mod_info_t modChild;
-		if(dlMostFree.insert(value, bNotifyOldLink, pio))
+		if(dlMostFree.insert(value, bOvr, pio))
 		{
-			if(*bNotifyOldLink) pio->notifyPageWOldLink(pageOrigId());
+			if(*bOvr) pio->notifyPageWOldLink(pageOrigId());
 
 			// check if dlMostFree is still the most free node
 			if(dlMostFree.sizeFree() < szSecondMostFree)
@@ -2530,7 +2527,7 @@ DupKeyNode::insertR(BufferCRef value, bool* bNotifyOldLink, PageIO* pio)
 				// dlMostFree is no longer the most free child...
 				PTNK_ASSERT(iSecondMostFree != -1);
 
-				DupKeyNode ovr(pio->modifyPage(*this, bNotifyOldLink));
+				DupKeyNode ovr(pio->modifyPage(*this, bOvr));
 				{
 					ovr.e(iX).sizeFree = dlMostFree.sizeFree();
 					ovr.e(iSecondMostFree).sizeFree = MOSTFREE_TAG;
@@ -2549,12 +2546,12 @@ DupKeyNode::insertR(BufferCRef value, bool* bNotifyOldLink, PageIO* pio)
 			DupKeyLeaf dlNew(pio->newInitPage<DupKeyLeaf>());
 			dlNew.initBody(BufferCRef::INVALID_VAL);// don't store key to non-root leaf
 
-			bool bSuccess = dlNew.insert(value, bNotifyOldLink, pio);
+			bool bSuccess = dlNew.insert(value, bOvr, pio);
 			PTNK_ASSERT(bSuccess); (void)bSuccess; // above should never fail
 
-			if(*bNotifyOldLink) pio->notifyPageWOldLink(pageOrigId());
+			if(*bOvr) pio->notifyPageWOldLink(pageOrigId());
 
-			DupKeyNode ovr(pio->modifyPage(*this, bNotifyOldLink));
+			DupKeyNode ovr(pio->modifyPage(*this, bOvr));
 			{
 				ovr.e(iX).sizeFree = dlMostFree.sizeFree();
 
@@ -2813,12 +2810,12 @@ btree_get(page_id_t pgidRoot, BufferCRef key, BufferRef value, PageIO* pio)
 }
 
 void
-dktree_insert_exactkey(btree_cursor_t* cur, BufferCRef value, bool* bNotifyOldLink, PageIO* pio)
+dktree_insert_exactkey(btree_cursor_t* cur, BufferCRef value, bool* bOvr, PageIO* pio)
 {
 	if(cur->leaf.pageType() == PT_DUPKEYLEAF)
 	{
 		DupKeyLeaf dl(cur->leaf);
-		if(dl.insert(value, bNotifyOldLink, pio))
+		if(dl.insert(value, bOvr, pio))
 		{
 			// no leaf overflow...
 
@@ -2829,20 +2826,20 @@ dktree_insert_exactkey(btree_cursor_t* cur, BufferCRef value, bool* bNotifyOldLi
 			// leaf overflow...
 			
 			// make DupKey tree
-			DupKeyNode dn(dl.makeTree(bNotifyOldLink, pio));
-			dn.insert(value, bNotifyOldLink, pio);
+			DupKeyNode dn(dl.makeTree(bOvr, pio));
+			dn.insert(value, bOvr, pio);
 		}
 	}
 	else /* if PT_DUPKEYNODE */
 	{
 		PTNK_ASSERT(cur->leaf.pageType() == PT_DUPKEYNODE);
 
-		DupKeyNode(cur->leaf).insert(value, bNotifyOldLink, pio);
+		DupKeyNode(cur->leaf).insert(value, bOvr, pio);
 	}
 }
 
 void
-dktree_insert(btree_cursor_t* cur, BufferCRef key, BufferCRef value, btree_split_t* split, bool* bNotifyOldLink, PageIO* pio)
+dktree_insert(btree_cursor_t* cur, BufferCRef key, BufferCRef value, btree_split_t* split, bool* bOvr, PageIO* pio)
 {
 	BufferCRef keyDK;
 	if(cur->leaf.pageType() == PT_DUPKEYLEAF)
@@ -2857,7 +2854,7 @@ dktree_insert(btree_cursor_t* cur, BufferCRef key, BufferCRef value, btree_split
 	int cmp = bufcmp(key, keyDK);
 	if(cmp == 0)
 	{
-		dktree_insert_exactkey(cur, value, bNotifyOldLink, pio);
+		dktree_insert_exactkey(cur, value, bOvr, pio);
 	}
 	else if(PTNK_LIKELY(cmp > 0))
 	{
@@ -2872,7 +2869,7 @@ dktree_insert(btree_cursor_t* cur, BufferCRef key, BufferCRef value, btree_split
 				*cur = curN;
 				Leaf l(cur->leaf);
 				bool bUpdateKey = (bufcmp(key, l.keyFirst()) < 0);
-				l.insert(key, value, split, bNotifyOldLink, pio);
+				l.insert(key, value, split, bOvr, pio);
 				if(bUpdateKey)
 				{
 					if(! split->isValid())
@@ -2932,7 +2929,7 @@ dktree_insert(btree_cursor_t* cur, BufferCRef key, BufferCRef value, btree_split
 			split->addSplit(keyDK, copy.pageId());
 
 			// - new Leaf (overwrite previous DupKeyLeaf/Node)
-			Leaf ln(pio->modifyPage(cur->leaf, bNotifyOldLink), true);
+			Leaf ln(pio->modifyPage(cur->leaf, bOvr), true);
 			{
 				ln.hdr()->type = PT_LEAF;
 				ln.initBody();
@@ -2947,10 +2944,10 @@ dktree_insert(btree_cursor_t* cur, BufferCRef key, BufferCRef value, btree_split
 }
 
 void
-dktree_update(btree_cursor_t* cur, BufferCRef value, bool* bNotifyOldLink, PageIO* pio)
+dktree_update(btree_cursor_t* cur, BufferCRef value, bool* bOvr, PageIO* pio)
 {
 	// tmp
-	DupKeyLeaf(cur->leaf).update(value, bNotifyOldLink, pio);
+	DupKeyLeaf(cur->leaf).update(value, bOvr, pio);
 }
 
 static

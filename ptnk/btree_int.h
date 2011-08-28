@@ -330,7 +330,7 @@ public:
 	void cursorGet(BufferRef key, ssize_t* szKey, BufferRef value, ssize_t* szValue, const btree_cursor_t& cursor) const;
 	ssize_t cursorGetValue(BufferRef value, const btree_cursor_t& cursor) const;
 
-	void cursorPut(btree_cursor_t* cur, BufferCRef value, btree_split_t* split, bool* bNotifyOldLink, PageIO* pio);
+	void cursorPut(btree_cursor_t* cur, BufferCRef value, btree_split_t* split, bool* bOvr, PageIO* pio);
 
 	ssize_t get(BufferCRef key, BufferRef buf) const;
 
@@ -342,10 +342,10 @@ public:
 	 *	@param [out] mod
 	 *		maybe filled by pio->modifyPage() internally issued
 	 */
-	void insert(BufferCRef key, BufferCRef value, btree_split_t* split, bool* bNotifyOldLink, PageIO* pio, bool bAbortOnExisting = false);
+	void insert(BufferCRef key, BufferCRef value, btree_split_t* split, bool* bOvr, PageIO* pio, bool bAbortOnExisting = false);
 
 	//! update value of the first key matching record
-	void update(BufferCRef key, BufferCRef value, btree_split_t* split, bool* bNotifyOldLink, PageIO* pio);
+	void update(BufferCRef key, BufferCRef value, btree_split_t* split, bool* bOvr, PageIO* pio);
 
 	bool cursorDelete(btree_cursor_t* cur, bool* bOvr, PageIO* pio);
 	
@@ -583,7 +583,7 @@ public:
 		header().nPtr = 1;
 	}
 
-	void insert(BufferCRef value, bool *bNotifyOldLink, PageIO* pio);
+	void insert(BufferCRef value, bool *bOvr, PageIO* pio);
 	// bool update(btree_cursor_t* cur, BufferCRef value, mod_info_t* mod, PageIO* pio);
 
 	BufferCRef key() const;
@@ -612,7 +612,7 @@ public:
 	page_id_t ptrAfter(page_id_t p) const;
 
 private:
-	bool insertR(BufferCRef value, bool *bNotifyOldLink, PageIO* pio);
+	bool insertR(BufferCRef value, bool *bOvr, PageIO* pio);
 	// bool updateR(btree_cursor_t* cur, BufferCRef value, mod_info_t* mod, PageIO* pio);
 
 	enum
@@ -811,12 +811,12 @@ public:
 		return vByOffset(offsetIdx(idx));
 	}
 
-	bool insert(BufferCRef value, bool* bNotifyOldLink, PageIO* pio);
-	bool update(BufferCRef value, bool* bNotifyOldLink, PageIO* pio);
+	bool insert(BufferCRef value, bool* bOvr, PageIO* pio);
+	bool update(BufferCRef value, bool* bOvr, PageIO* pio);
 
-	bool popValue(mod_info_t* mod, PageIO* pio);
+	bool popValue(bool* bOvr, PageIO* pio);
 
-	DupKeyNode makeTree(bool* bNotifyOldLink, PageIO* pio);
+	DupKeyNode makeTree(bool* bOvr, PageIO* pio);
 
 private:
 	enum

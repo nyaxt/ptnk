@@ -15,6 +15,8 @@
 #include <boost/foreach.hpp>
 #include <boost/tuple/tuple.hpp>
 
+// #define VERBOSE_PAGEIO
+
 namespace ptnk
 {
 
@@ -499,7 +501,7 @@ RETRY:
 	if(pgidL >= m_active->numPagesReserved())
 	{
 		// need more pages...
-#ifdef VERBOSE_PAGEIOMEM
+#ifdef VERBOSE_PAGEIO
 		std::cout << "running out of space" << std::endl;
 #endif
 		boost::unique_lock<boost::mutex> g(m_mtxAlloc);
@@ -508,8 +510,8 @@ RETRY:
 		ssize_t numNeeded = m_pgidLNext - m_active->numPagesReserved() + 1;
 		if(numNeeded > 0)
 		{
-#ifdef VERBOSE_PAGEIOMEM
-			std::cout << "I'm the one going to alloc!!!" << std::endl;
+#ifdef VERBOSE_PAGEIO
+			std::cout << "I'm the one going to alloc!!!: " << boost::this_thread::get_id() << std::endl;
 #endif
 			// do alloc
 			m_active->expandFile(numNeeded);
