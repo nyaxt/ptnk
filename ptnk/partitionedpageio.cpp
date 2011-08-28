@@ -1,5 +1,6 @@
 #include "partitionedpageio.h"
 #include "pageiomem.h"
+#include "fileutils.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -17,8 +18,257 @@
 namespace ptnk
 {
 
+MappedFile*
+MappedFile::createNew(part_id_t partid, const char* filename, ptnk_opts_t opts, int mode)
+{
+	if(!(opts & OTRUNCATE) && file_exists(filename))
+	{
+		PTNK_THROW_RUNTIME_ERR((boost::format("file %1% already exists (and OTRUNCATE not specified)") % filename).str());
+	}
+
+	PTNK_CHECK((opts & OWRITER) && (opts & OCREATE));
+
+	// open file
+	int fd;
+	{
+		int flags = O_RDWR | O_CREAT;
+		if(opts & OTRUNCATE) flags |= O_TRUNC;
+
+		PTNK_ASSURE_SYSCALL(fd = ::open(filename, flags, mode));
+	}
+	
+	std::auto_ptr<MappedFile> mf(new MappedFile(partid, filename, fd, PROT_READ | PROT_WRITE));
+	mf->expandFile(1024);
+
+	return mf.release();
+}
+
+MappedFile*
+MappedFile::openExisting(part_id_t partid, const char* filename, ptnk_opts_t opts)
+{
+	// get file stat
+	size_t filesize = 0;
+	{
+		struct stat st;
+		PTNK_ASSURE_SYSCALL(::stat(filename, &st) < 0);
+
+		if(! S_ISREG(st.st_mode))
+		{
+			PTNK_THROW_RUNTIME_ERR("specified dbfile is not a regular file");	
+		}
+
+		filesize = st.st_size;
+	}
+
+	// open file
+	int prot = PROT_READ;
+	int fd;
+	{
+		int flags = 0;
+		if(opts & OWRITER)
+		{
+			flags |= O_RDWR;
+			prot |= PROT_WRITE;
+		}
+		else
+		{
+			flags |= O_RDONLY;	
+		}
+
+		PTNK_ASSURE_SYSCALL(fd = ::open(filename, flags));
+	}
+
+	std::auto_ptr<MappedFile> mf(new MappedFile(partid, filename, fd, prot));
+
+	size_t pgs = filesize / PTNK_PAGE_SIZE;
+	if(pgs > 0)
+	{
+		mf->moreMMap(pgs);
+	}
+
+	return mf.release();
+}
+
+MappedFile::MappedFile(part_id_t partid, const char* filename, int fd, int prot)
+:	m_partid(partid), m_filename(filename), m_fd(fd), m_prot(prot), m_numPagesReserved(0)
+{
+	m_mapFirst.pgidLast = 0;
+	m_mapFirst.offset = NULL;
+}
+
+MappedFile::~MappedFile()
+{
+	/* NOP */
+}
+
+MappedFile::Mapping*
+MappedFile::getmLast()
+{
+	Mapping* p = &m_mapFirst, *np = NULL;
+	while((np = m_mapFirst.next.get()))
+	{
+		p = np;
+	}
+
+	return p;
+}
+
+void
+MappedFile::moreMMap(size_t pgs)
+{
+	Mapping* mLast = getmLast();
+
+	char* offset;
+	char* hint = (mLast->offset != NULL) ? mLast->offset : PTNK_MMAP_HINT;
+
+	if(isFile())
+	{
+		PTNK_ASSURE_SYSCALL_NEQ(
+			offset = static_cast<char*>(::mmap(hint, pgs * PTNK_PAGE_SIZE, m_prot, MAP_SHARED, m_fd, m_numPagesReserved * PTNK_PAGE_SIZE)),
+			MAP_FAILED
+			)
+		{
+			std::cerr << "m_fd: " << m_fd<< std::endl;	
+		};
+	}
+	else
+	{
+		PTNK_ASSURE_SYSCALL_NEQ(
+			offset = static_cast<char*>(::mmap(hint, pgs * PTNK_PAGE_SIZE, PROT_READ | PROT_WRITE, MAP_SHARED | MAP_ANON, m_fd, 0)),
+			MAP_FAILED
+			)
+		{
+			std::cerr << "m_fd: " << m_fd<< std::endl;	
+		};
+	}
+	PTNK_ASSERT(offset);
+
+	if(offset == hint)
+	{
+		// newly mapped region contiguous to current one...
+		
+		if(! mLast->offset) mLast->offset = offset;
+		m_numPagesReserved = mLast->pgidLast = mLast->pgidLast + pgs;
+	}
+	else
+	{
+		std::auto_ptr<Mapping> mNew(new Mapping);
+
+		m_numPagesReserved = mNew->pgidLast = mLast->pgidLast + pgs;
+		mNew->offset = offset;
+		
+		mLast->next = mNew; // move semantics
+	}
+}
+
+void
+MappedFile::expandFile(size_t pgs)
+{
+	if(pgs < NUM_PAGES_ALLOC_ONCE) pgs = NUM_PAGES_ALLOC_ONCE;
+
+	// expand file size
+	if(isFile())
+	{
+		size_t allocsize = pgs * PTNK_PAGE_SIZE;
+	#ifdef USE_POSIX_FALLOCATE
+		PTNK_ASSURE_SYSCALL(::posix_fallocate(m_fd, m_numPagesReserved * PTNK_PAGE_SIZE, allocsize));
+	#else
+		// expand file first
+		boost::scoped_ptr<char> buf(new char[allocsize + PTNK_PAGE_SIZE]);
+		PTNK_ASSURE_SYSCALL(::pwrite(m_fd, buf.get(), allocsize, m_numPagesReserved * PTNK_PAGE_SIZE));
+		PTNK_ASSURE_SYSCALL(::fsync(m_fd));
+	#endif
+	}
+
+	// mmap expanded region
+	moreMMap(pgs);
+}
+
+char*
+MappedFile::calcPtr(local_pgid_t pgid)
+{
+	int d = pgid;
+
+	Mapping* p = &m_mapFirst;
+	for(;;)
+	{
+		if(PTNK_LIKELY(pgid < p->pgidLast))
+		{
+			return p->offset + PTNK_PAGE_SIZE * d;
+		}
+
+		d -= p->pgidLast;
+		p = m_mapFirst.next.get();
+		if(! p) PTNK_THROW_RUNTIME_ERR("page not mapped");
+	}
+}
+
+void
+MappedFile::sync(local_pgid_t pgidStart, local_pgid_t pgidEnd)
+{
+	if(! isFile()) return; // no need to sync when not mapped to file
+
+#ifdef PTNK_FDATASYNC
+	PTNK_ASSURE_SYSCALL(::fdatasync(m_fd));
+	return;
+#endif
+
+	if(pgidEnd > m_numPagesReserved) pgidEnd = m_numPagesReserved;
+
+#ifdef PTNK_SYNC_FILE_RANGE
+	loff_t off = ((loff_t)pgidStart) * PTNK_PAGE_SIZE;
+	loff_t len = ((loff_t)(pgidEnd - pgidStart + 1)) * PTNK_PAGE_SIZE;
+	if(len < 0) return;
+	PTNK_ASSURE_SYSCALL(::sync_file_range(m_fd, off, len, SYNC_FILE_RANGE_WRITE | SYNC_FILE_RANGE_WAIT_BEFORE | SYNC_FILE_RANGE_WAIT_AFTER))
+	{
+		std::cout << "syncRange " << pgid2str(pgidStart) << " to " << pgid2str(pgidEnd) << std::endl;
+		std::cout << "m_fd: " << m_fd << std::endl;
+		std::cout << "off: " << off << " len: " << len << std::endl;
+	}
+#else
+	Mapping* m = &m_mapFirst;
+	int d = pgidStart;
+	while(m)
+	{
+		if(pgidEnd < m->pgidLast)
+		{
+			size_t off = m->offset + PTNK_PAGE_SIZE * d;
+			size_t len = PTNK_PAGE_SIZE * (m->pgidLast - pgidStart);
+			PTNK_ASSURE_SYSCALL(::msync(off, len, MS_SYNC | MS_INVALIDATE));
+
+			pgidStart = m->pgidLast;
+			d -= m->pgidLast;
+			m = m_mapFirst.next.get();
+			if(! m) break;
+		}
+		else
+		{
+			size_t off = m->offset + PTNK_PAGE_SIZE * d;
+			size_t len = PTNK_PAGE_SIZE * (m->pgidLast - pgidStart);
+			PTNK_ASSURE_SYSCALL(::msync(off, len, MS_SYNC | MS_INVALIDATE));
+
+			break;	
+		}
+	}
+#endif
+}
+
+void
+MappedFile::dumpStat() const
+{
+	std::cout << "- partition id: " << (boost::format("%03x") % partid()) << std::endl;	
+	std::cout << "  filename: " << m_filename << std::endl;	
+}
+
+void
+MappedFile::discardFile()
+{
+	std::cerr << "discarding old partition file: " << m_filename << std::endl;
+	PTNK_ASSURE_SYSCALL(::unlink(m_filename.c_str()));
+}
+
 PartitionedPageIO::PartitionedPageIO(const char* dbprefix, ptnk_opts_t opts, int mode)
-:	m_mode(mode), m_opts(opts), m_active(NULL), m_partidFirst(0), m_partidLast(0)
+:	m_mode(mode), m_opts(opts), m_active(NULL), m_pgidLNext(0), m_partidFirst(0), m_partidLast(0)
 {
 	PTNK_ASSERT(dbprefix != NULL && *dbprefix != '\0');
 	m_dbprefix = dbprefix;
@@ -51,6 +301,7 @@ PartitionedPageIO::PartitionedPageIO(const char* dbprefix, ptnk_opts_t opts, int
 		}
 		else
 		{
+			scanLastPgId(); // set m_pgidLNext correct value
 			m_needInit = false;	
 		}
 	}
@@ -72,60 +323,6 @@ PartitionedPageIO::drop(const char* dbprefix)
 		PTNK_ASSURE_SYSCALL(::unlink(filepath.c_str()));
 	}
 }
-
-void
-PartitionedPageIO::Partition::dumpStat() const
-{
-	std::cout << "- partition id: " << (boost::format("%03x") % partid()) << std::endl;	
-	std::cout << "  file path: " << filepath() << std::endl;	
-	if(m_parthandler.get())
-	{
-		std::cout << "  range: " << pgid2str(PGID_PARTLOCAL(partid(), m_parthandler->getFirstPgId()))
-	              << " to "      << pgid2str(PGID_PARTLOCAL(partid(), m_parthandler->getLastPgId())) << std::endl;
-		m_parthandler->dumpStat();
-	}
-	else
-	{
-		std::cout << "  ! no parthandler instantiated" << std::endl;	
-	}
-}
-
-void
-PartitionedPageIO::Partition::discardFile()
-{
-	std::cerr << "discarding old partition file: " << m_filepath << std::endl;
-	PTNK_ASSURE_SYSCALL(::unlink(m_filepath.c_str()));
-}
-
-void
-PartitionedPageIO::Partition::instantiateHandler()
-{
-	// FIXME: give hint for mmap-ing
-	// FIXME: instantiate as read-only if possible
-	// FIXME: check magic for compacted or not
-
-	m_parthandler.reset(new PageIOMem(filepath().c_str(), m_optsPIO, m_mode));
-}
-
-namespace
-{
-
-bool
-checkperm(const char* filepath, int flags)
-{
-	int ret = ::open(filepath, flags);
-	if(ret >= 0)
-	{
-		::close(ret);
-		return true;
-	}
-	else
-	{
-		return false;
-	}
-}
-
-} // end of anonymous namespace
 
 void
 PartitionedPageIO::scanFiles(Vpartfile_t* files, const char* dbprefix)
@@ -235,8 +432,8 @@ PartitionedPageIO::openFiles()
 				optsPIO &= ~(ptnk_opts_t)OWRITER;
 			}
 
-			Partition* p;
-			p = new Partition(partid, filepath, optsPIO, m_mode /* not used for existing file */);
+			MappedFile* p;
+			p = MappedFile::openExisting(partid, filepath.c_str(), optsPIO);
 			m_parts.replace(partid, p);
 
 			// if the part file is writable and is the newest partition, set the partition active
@@ -248,10 +445,35 @@ PartitionedPageIO::openFiles()
 	}
 }
 
-PartitionedPageIO::Partition*
+void
+PartitionedPageIO::scanLastPgId()
+{
+	// find last committed pg
+	for(local_pgid_t pgidL = m_active->numPagesReserved() - 1; pgidL != ~0UL; -- pgidL)
+	{
+		Page pg(readPage(PGID_PARTLOCAL(m_active->partid(), pgidL)));
+		if(pg.isCommitted())
+		{
+			m_pgidLNext = pgidL + 1;
+			break;
+		}
+	}
+}
+
+MappedFile*
 PartitionedPageIO::addNewPartition()
 {
-	part_id_t partid = ++m_partidLast;
+	part_id_t partid;
+	if(! m_active)
+	{
+		// first partition
+		partid = 0;
+	}
+	else
+	{
+		partid = ++m_partidLast;
+	}
+
 	if(partid > PTNK_PARTID_MAX)
 	{
 		PTNK_THROW_RUNTIME_ERR("FIXME: handle part num > PTNK_PARTID_MAX");	
@@ -261,12 +483,12 @@ PartitionedPageIO::addNewPartition()
 	char suffix[10]; sprintf(suffix, ".%03x.ptnk", partid);
 	filename.append(suffix);
 
-	if(checkperm(filename.c_str(), 0))
+	if(file_exists(filename.c_str()))
 	{
-		PTNK_THROW_RUNTIME_ERR("wierd! the dbfile for the new partid already exists!");	
+		PTNK_THROW_RUNTIME_ERR("weird! the dbfile for the new partid already exists!");	
 	}
 
-	Partition* p = m_active = new Partition(partid, filename, m_opts, m_mode);
+	MappedFile* p = m_active = MappedFile::createNew(partid, filename.c_str(), m_opts, m_mode);
 	m_parts.replace(partid, p);
 
 	return p;
@@ -275,33 +497,56 @@ PartitionedPageIO::addNewPartition()
 pair<Page, page_id_t>
 PartitionedPageIO::newPage()
 {
-	Page pg; page_id_t pgidLocal;
-	boost::tie(pg, pgidLocal) = m_active->handler()->newPage();
+	local_pgid_t pgidL;
 
-	page_id_t pgid = PGID_PARTLOCAL(m_active->partid(), pgidLocal);
+RETRY:
+	pgidL = m_pgidLNext;
+	if(pgidL >= m_active->numPagesReserved())
+	{
+		// need more pages...
+#ifdef VERBOSE_PAGEIOMEM
+		std::cout << "running out of space" << std::endl;
+#endif
+		boost::unique_lock<boost::mutex> g(m_mtxAlloc);
 
-	return make_pair(pg, pgid);
+		// make sure that other thread has not already alloced pages
+		ssize_t numNeeded = m_pgidLNext - m_active->numPagesReserved() + 1;
+		if(numNeeded > 0)
+		{
+#ifdef VERBOSE_PAGEIOMEM
+			std::cout << "I'm the one going to alloc!!!" << std::endl;
+#endif
+			// do alloc
+			m_active->expandFile(numNeeded);
+		}
+		
+		goto RETRY;
+	}
+
+	if(! __sync_bool_compare_and_swap(&m_pgidLNext, pgidL, pgidL+1))
+	{
+		// reservation failed
+
+		goto RETRY;
+	}
+
+	page_id_t pgid = PGID_PARTLOCAL(m_active->partid(), pgidL);
+	return make_pair(Page(m_active->calcPtr(pgidL), true), pgid);
 }
 
 Page
 PartitionedPageIO::readPage(page_id_t pgid)
 {
 	part_id_t partid = PGID_PARTID(pgid);
-	return m_parts[partid].handler()->readPage(PGID_LOCALID(pgid));
-}
-
-Page
-PartitionedPageIO::modifyPage(const Page& pg, mod_info_t* mod)
-{
-	part_id_t partid = PGID_PARTID(pg.pageId());
-	return m_parts[partid].handler()->modifyPage(pg, mod);
+	return Page(m_parts[partid].calcPtr(PGID_LOCALID(pgid)), false);
 }
 
 void
 PartitionedPageIO::sync(page_id_t pgid)
 {
 	part_id_t partid = PGID_PARTID(pgid);
-	return m_parts[partid].handler()->sync(PGID_LOCALID(pgid));
+	local_pgid_t pgidL = PGID_LOCALID(pgid);
+	return m_parts[partid].sync(pgidL, pgidL);
 }
 
 void
@@ -313,13 +558,13 @@ PartitionedPageIO::syncRange(page_id_t pgidStart, page_id_t pgidEnd)
 	part_id_t partStart;
 	while(PTNK_UNLIKELY((partStart = PGID_PARTID(pgidStart)) != partEnd))
 	{
-		m_parts[partStart].handler()->syncRange(
+		m_parts[partStart].sync(
 			PGID_LOCALID(pgidStart), PTNK_LOCALID_INVALID
 			);
 		pgidStart = PGID_PARTSTART(partStart + 1);
 	}
 
-	m_parts[partStart].handler()->syncRange(
+	m_parts[partStart].sync(
 		PGID_LOCALID(pgidStart), PGID_LOCALID(pgidEnd)
 		);
 }
@@ -328,7 +573,7 @@ page_id_t
 PartitionedPageIO::getLastPgId() const
 {
 	part_id_t partid = m_active->partid();
-	local_pgid_t localid = m_active->handler()->getLastPgId();
+	local_pgid_t localid = m_pgidLNext - 1;
 
 	return PGID_PARTLOCAL(partid, localid);
 }
@@ -336,13 +581,19 @@ PartitionedPageIO::getLastPgId() const
 local_pgid_t
 PartitionedPageIO::getPartLastLocalPgId(part_id_t partid) const
 {
+	if(partid == m_active->partid())
+	{
+		return m_pgidLNext - 1;	
+	}
+
 	if(! m_parts.is_null(partid))
 	{
-		return PGID_LOCALID(m_parts[partid].handler()->getLastPgId());
+		// FIXME: this is not always correct
+		return PGID_LOCALID(m_parts[partid].numPagesReserved()-1);
 	}
 	else
 	{
-		return PTNK_LOCALID_INVALID;	
+		return PTNK_LOCALID_INVALID;
 	}
 }
 
@@ -360,7 +611,7 @@ PartitionedPageIO::newPart(bool bForce)
 	{
 		// is new part. really needed?
 
-		if(m_active->numPages() < 128 * 1024 * 1024 / 4096) // less than 128mb
+		if(m_active->numPagesReserved() < 128 * 1024 * 1024 / 4096) // less than 128mb
 		{
 			return;	
 		}
@@ -374,7 +625,7 @@ PartitionedPageIO::dumpStat() const
 {
 	std::cout << "* PartitionedPageIO stat dump *" << std::endl;
 	std::cout << " - partidFirst: " << m_partidFirst << " Last: " << m_partidLast << std::endl;
-	BOOST_FOREACH(const Partition& part, m_parts)
+	BOOST_FOREACH(const MappedFile& part, m_parts)
 	{
 		if(&part) part.dumpStat();
 	}
@@ -385,7 +636,7 @@ PartitionedPageIO::numPartitions_() const
 {
 	size_t ret = 0;	
 
-	BOOST_FOREACH(const Partition& part, m_parts)
+	BOOST_FOREACH(const MappedFile& part, m_parts)
 	{
 		if(&part) ++ ret;
 	}
@@ -421,7 +672,7 @@ PartitionedPageIO::discardOldPages(page_id_t threshold)
 	// FIXME: won't work if partid wrap around
 	for(part_id_t id = 0; id < partidT; ++ id)
 	{
-		Partition& part = m_parts[id];
+		MappedFile& part = m_parts[id];
 		if(! &part) continue;
 
 		part.discardFile();

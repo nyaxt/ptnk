@@ -5,9 +5,93 @@
 #include <boost/thread.hpp>
 
 #include "pageio.h"
+#include "pageiomem.h"
 
 namespace ptnk
 {
+
+class MappedFile
+{
+public:
+	enum
+	{
+		NUM_PAGES_ALLOC_ONCE = 256,
+	};
+
+	static MappedFile* openExisting(part_id_t partid, const char* filename, ptnk_opts_t opts);
+	static MappedFile* createNew(part_id_t partid, const char* filename, ptnk_opts_t opts, int mode);
+	~MappedFile();
+
+	page_id_t alloc();
+	char* calcPtr(local_pgid_t pgid);
+	void sync(local_pgid_t pgidStart, local_pgid_t pgidEnd);
+
+	//! expand file size and mapped region
+	void expandFile(size_t pgs);
+
+	size_t numPagesReserved() const
+	{
+		return m_numPagesReserved;	
+	}
+
+	part_id_t partid() const
+	{
+		return m_partid;	
+	}
+
+	const std::string& filename() const
+	{
+		return m_filename;
+	}
+
+	void dumpStat() const;
+	void discardFile();
+
+	bool isFile() const
+	{
+		return ! m_filename.empty();	
+	}
+	
+private:
+	//! struct corresponding to mmap-ed region (linked list)
+	struct Mapping
+	{
+		//! last valid pgid
+		page_id_t pgidLast;
+
+		char* offset;
+
+		//! ptr to next mapping
+		std::auto_ptr<Mapping> next;
+	};
+
+	MappedFile(part_id_t partid, const char* filename, int fd, int prot);
+
+	//! mmap more pages (does NOT expand file size)
+	void moreMMap(size_t pgs);
+
+	//! partition id
+	part_id_t m_partid;
+
+	//! path of file responsible for this partition
+	/*!
+	 *	empty if not mapped to file (just mem)
+	 */
+	std::string m_filename;
+
+	//! opened file descriptor
+	int m_fd;
+
+	//! prot passed to mmap(2)
+	int m_prot;
+
+	//! first mmap-ed region
+	Mapping m_mapFirst;
+
+	Mapping* getmLast();
+
+	local_pgid_t m_numPagesReserved;
+};
 
 class PartitionedPageIO : public PageIO
 {
@@ -37,7 +121,6 @@ public:
 	virtual pair<Page, page_id_t> newPage();
 
 	virtual Page readPage(page_id_t pgid);
-	virtual Page modifyPage(const Page& page, mod_info_t* mod);
 	virtual void sync(page_id_t pgid);
 	virtual void syncRange(page_id_t pgidStart, page_id_t pgidEnd);
 
@@ -56,76 +139,13 @@ public:
 	size_t numPartitions_() const;
 
 private:
-	class Partition
-	{
-	public:
-		Partition(part_id_t partid, const std::string& filepath, ptnk_opts_t optsPIO, int mode)
-		:	m_partid(partid), m_filepath(filepath), m_optsPIO(optsPIO), m_mode(mode)
-		{
-			/* NOP */
-		}
-
-		part_id_t partid() const
-		{
-			return m_partid;	
-		}
-
-		const std::string& filepath() const
-		{
-			return m_filepath;	
-		}
-
-		PageIO* handler()
-		{
-			if(! m_parthandler.get())
-			{
-				// perform delayed instantiation of handler
-				instantiateHandler();	
-			}
-			return m_parthandler.get();	
-		}
-
-		const PageIO* handler() const
-		{
-			return const_cast<Partition*>(this)->handler();
-		}
-
-		int numPages() const
-		{
-			return handler()->getLastPgId() - handler()->getFirstPgId() + 1;
-		}
-
-		void dumpStat() const;
-		void discardFile();
-		
-	private:
-		//! instantiate PageIO to m_parthandler
-		void instantiateHandler();
-
-		//! partition id
-		part_id_t m_partid;
-
-		//! path of file responsible for this partition
-		std::string m_filepath;
-
-		//! opts for instantiating handler PageIO
-		ptnk_opts_t m_optsPIO;
-
-		//! file mode for creating new file for this partition
-		int m_mode;
-		
-		//! PageIO responsible for the partition
-		std::auto_ptr<PageIO> m_parthandler;
-	};
-
 	//! open partitioned db files and populate m_parts
 	void openFiles();
 
 	//! add new partition
-	Partition* addNewPartition();
+	MappedFile* addNewPartition();
 
-	//! discard partition and delete its file
-	void discardPartition(Partition* part);
+	void scanLastPgId();
 
 	//! db prefix str. see C-tor param
 	std::string m_dbprefix;
@@ -138,13 +158,18 @@ private:
 
 	bool m_needInit;
 
-	boost::ptr_array<boost::nullable<Partition>, PTNK_PARTID_MAX+1> m_parts;
+	boost::ptr_array<boost::nullable<MappedFile>, PTNK_PARTID_MAX+1> m_parts;
+
+	boost::mutex m_mtxAlloc;
 
 	//! active partition where new pages are created
 	/*!
 	 *	all other partitions are read-only
 	 */
-	Partition* m_active;
+	MappedFile* m_active;
+
+	//! next free m_active local pgid
+	volatile local_pgid_t m_pgidLNext;
 
 	//! first loaded partition id
 	part_id_t m_partidFirst;

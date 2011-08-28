@@ -3553,6 +3553,28 @@ TEST(ptnk, PartitionedPageIO_scanfile)
 	EXPECT_EQ(4U, ppio->numPartitions_());
 }
 
+TEST(ptnk, PartitionedPageIO_basic)
+{
+	t_mktmpdir("./_testtmp");
+
+	PartitionedPageIO pio("./_testtmp/ppio_basic", OWRITER | OCREATE | OTRUNCATE);
+
+	Page pg; page_id_t pgid;
+	boost::tie(pg, pgid) = pio.newPage();
+
+	// std::cout << "pgid: " << pgid2str(pgid) << std::endl;
+	// std::cout << "pg addr: " << (void*)pg.getRaw() << std::endl;
+	ASSERT_TRUE(pg.getRaw()) << "ptr of new page invalid";
+
+	Page pg2; page_id_t pgid2;
+	boost::tie(pg2, pgid2) = pio.newPage();
+
+	ASSERT_TRUE(pg2.getRaw()) << "ptr of new page2 invalid";
+	ASSERT_NE(pgid, pgid2);
+	ASSERT_NE(pg.getRaw(), pg2.getRaw());
+	ASSERT_EQ(PTNK_PAGE_SIZE, pg2.getRaw() - pg.getRaw());
+}
+
 TEST(ptnk, PartitionedPageIO_singlepart)
 {
 	t_mktmpdir("./_testtmp");

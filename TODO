@@ -1,3 +1,6 @@
+- workdir may change while run by lib user
+  - PartitionedPageIO have to handle that
+
 - documentation: add warnings to TableOffCache
   - can be reused across transactions, but can't be shared by two or more concurrent transactions.
 
