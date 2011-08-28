@@ -105,7 +105,7 @@ MappedFile::Mapping*
 MappedFile::getmLast()
 {
 	Mapping* p = &m_mapFirst, *np = NULL;
-	while((np = m_mapFirst.next.get()))
+	while((np = p->next.get()))
 	{
 		p = np;
 	}
@@ -198,7 +198,7 @@ MappedFile::calcPtr(local_pgid_t pgid)
 		}
 
 		d -= p->pgidLast;
-		p = m_mapFirst.next.get();
+		p = p->next.get();
 		if(! p) PTNK_THROW_RUNTIME_ERR("page not mapped");
 	}
 }
@@ -339,7 +339,7 @@ PartitionedPageIO::scanFiles(Vpartfile_t* files, const char* dbprefix)
 	
 	// scan _pathdir_
 	DIR* dir;
-	PTNK_ASSURE_SYSCALL(dir = ::opendir(pathdir));
+	PTNK_ASSURE_SYSCALL_NEQ(dir = ::opendir(pathdir), NULL);
 
 	struct dirent* entry;
 	while((entry = ::readdir(dir)) != NULL)
