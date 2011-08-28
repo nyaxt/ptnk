@@ -92,7 +92,7 @@ MappedFile::openExisting(part_id_t partid, const char* filename, ptnk_opts_t opt
 MappedFile::MappedFile(part_id_t partid, const char* filename, int fd, int prot)
 :	m_partid(partid), m_filename(filename), m_fd(fd), m_prot(prot), m_numPagesReserved(0)
 {
-	m_mapFirst.pgidLast = 0;
+	m_mapFirst.pgidEnd = 0;
 	m_mapFirst.offset = NULL;
 }
 
@@ -118,13 +118,13 @@ MappedFile::moreMMap(size_t pgs)
 {
 	Mapping* mLast = getmLast();
 
-	char* offset;
-	char* hint = (mLast->offset != NULL) ? mLast->offset : PTNK_MMAP_HINT;
+	char* mapstart;
+	char* hint = (mLast->offset != NULL) ? mLast->offset + mLast->pgidEnd * PTNK_PAGE_SIZE : PTNK_MMAP_HINT;
 
 	if(isFile())
 	{
 		PTNK_ASSURE_SYSCALL_NEQ(
-			offset = static_cast<char*>(::mmap(hint, pgs * PTNK_PAGE_SIZE, m_prot, MAP_SHARED, m_fd, m_numPagesReserved * PTNK_PAGE_SIZE)),
+			mapstart = static_cast<char*>(::mmap(hint, pgs * PTNK_PAGE_SIZE, m_prot, MAP_SHARED, m_fd, m_numPagesReserved * PTNK_PAGE_SIZE)),
 			MAP_FAILED
 			)
 		{
@@ -134,7 +134,7 @@ MappedFile::moreMMap(size_t pgs)
 	else
 	{
 		PTNK_ASSURE_SYSCALL_NEQ(
-			offset = static_cast<char*>(::mmap(hint, pgs * PTNK_PAGE_SIZE, PROT_READ | PROT_WRITE, MAP_SHARED | MAP_ANON, m_fd, 0)),
+			mapstart = static_cast<char*>(::mmap(hint, pgs * PTNK_PAGE_SIZE, PROT_READ | PROT_WRITE, MAP_SHARED | MAP_ANON, m_fd, 0)),
 			MAP_FAILED
 			)
 		{
@@ -143,19 +143,19 @@ MappedFile::moreMMap(size_t pgs)
 	}
 	PTNK_ASSERT(offset);
 
-	if(offset == hint)
+	if(mapstart == hint)
 	{
 		// newly mapped region contiguous to current one...
 		
-		if(! mLast->offset) mLast->offset = offset;
-		m_numPagesReserved = mLast->pgidLast = mLast->pgidLast + pgs;
+		m_numPagesReserved = mLast->pgidEnd = mLast->pgidEnd + pgs;
+		if(! mLast->offset) mLast->offset = mapstart;
 	}
 	else
 	{
 		std::auto_ptr<Mapping> mNew(new Mapping);
 
-		m_numPagesReserved = mNew->pgidLast = mLast->pgidLast + pgs;
-		mNew->offset = offset;
+		m_numPagesReserved = mNew->pgidEnd = mLast->pgidEnd + pgs;
+		mNew->offset = mapstart - mLast->pgidEnd * PTNK_PAGE_SIZE;
 		
 		mLast->next = mNew; // move semantics
 	}
@@ -187,17 +187,14 @@ MappedFile::expandFile(size_t pgs)
 char*
 MappedFile::calcPtr(local_pgid_t pgid)
 {
-	int d = 0;
-
 	Mapping* p = &m_mapFirst;
 	for(;;)
 	{
-		if(PTNK_LIKELY(pgid < p->pgidLast))
+		if(PTNK_LIKELY(pgid < p->pgidEnd))
 		{
-			return p->offset + PTNK_PAGE_SIZE * (pgid - d);
+			return p->offset + PTNK_PAGE_SIZE * pgid;
 		}
 
-		d = p->pgidLast;
 		p = p->next.get();
 		if(! p) PTNK_THROW_RUNTIME_ERR("page not mapped");
 	}
@@ -227,24 +224,22 @@ MappedFile::sync(local_pgid_t pgidStart, local_pgid_t pgidEnd)
 	}
 #else
 	Mapping* m = &m_mapFirst;
-	int d = pgidStart;
 	while(m)
 	{
-		if(pgidEnd < m->pgidLast)
+		if(pgidEnd < m->pgidEnd)
 		{
-			size_t off = m->offset + PTNK_PAGE_SIZE * d;
-			size_t len = PTNK_PAGE_SIZE * (m->pgidLast - pgidStart);
+			size_t off = m->offset + PTNK_PAGE_SIZE * pgidStart;
+			size_t len = PTNK_PAGE_SIZE * (m->pgidEnd - pgidStart);
 			PTNK_ASSURE_SYSCALL(::msync(off, len, MS_SYNC | MS_INVALIDATE));
 
-			pgidStart = m->pgidLast;
-			d -= m->pgidLast;
-			m = m_mapFirst.next.get();
+			pgidStart = m->pgidEnd;
+			m = m->next.get();
 			if(! m) break;
 		}
 		else
 		{
-			size_t off = m->offset + PTNK_PAGE_SIZE * d;
-			size_t len = PTNK_PAGE_SIZE * (m->pgidLast - pgidStart);
+			size_t off = m->offset + PTNK_PAGE_SIZE * pgidStart;
+			size_t len = PTNK_PAGE_SIZE * (pgidEnd- pgidStart + 1);
 			PTNK_ASSURE_SYSCALL(::msync(off, len, MS_SYNC | MS_INVALIDATE));
 
 			break;	

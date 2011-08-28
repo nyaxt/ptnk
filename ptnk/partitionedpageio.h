@@ -56,8 +56,8 @@ private:
 	//! struct corresponding to mmap-ed region (linked list)
 	struct Mapping
 	{
-		//! last valid pgid
-		page_id_t pgidLast;
+		//! prev.pgidEnd <= pgid < pgidEnd is mapped
+		page_id_t pgidEnd;
 
 		char* offset;
 
