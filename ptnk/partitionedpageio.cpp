@@ -292,7 +292,7 @@ PartitionedPageIO::PartitionedPageIO(const char* dbprefix, ptnk_opts_t opts, int
 				PTNK_THROW_RUNTIME_ERR("opts OWRITER specified but no existing dbfile found. also specify OCREATE to create new dbfiles.");	
 			}
 
-			addNewPartition();
+			addNewPartition_unsafe();
 
 			m_needInit = true;
 		}
@@ -458,7 +458,7 @@ PartitionedPageIO::scanLastPgId()
 }
 
 MappedFile*
-PartitionedPageIO::addNewPartition()
+PartitionedPageIO::addNewPartition_unsafe()
 {
 	part_id_t partid;
 	if(! m_active)
@@ -505,6 +505,13 @@ RETRY:
 		std::cout << "running out of space" << std::endl;
 #endif
 		boost::unique_lock<boost::mutex> g(m_mtxAlloc);
+
+		if(m_pgidLNext >= 128 * 1024 * 1024 / PTNK_PAGE_SIZE)
+		{
+			addNewPartition_unsafe();
+			m_pgidLNext = 0;
+			goto RETRY;
+		}
 
 		// make sure that other thread has not already alloced pages
 		ssize_t numNeeded = m_pgidLNext - m_active->numPagesReserved() + 1;
@@ -614,7 +621,11 @@ PartitionedPageIO::newPart(bool bForce)
 		}
 	}
 
-	addNewPartition();
+	boost::unique_lock<boost::mutex> g(m_mtxAlloc);
+	m_pgidLNext = PTNK_LOCALID_INVALID; // force later newPage() call to wait on m_mtxAlloc
+
+	addNewPartition_unsafe();
+	m_pgidLNext = 0;
 }
 
 void

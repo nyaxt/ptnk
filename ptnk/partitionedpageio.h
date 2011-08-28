@@ -143,7 +143,7 @@ private:
 	void openFiles();
 
 	//! add new partition
-	MappedFile* addNewPartition();
+	MappedFile* addNewPartition_unsafe();
 
 	void scanLastPgId();
 

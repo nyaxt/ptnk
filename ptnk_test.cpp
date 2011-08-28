@@ -3829,11 +3829,10 @@ struct put_ary_db
 
 TEST(ptnk, multithread_put)
 {
-#ifdef DUMP_MTPUT
-	DB db("./_testtmp/mtput.ptnk", OWRITER | OCREATE | OTRUNCATE);
-#else
-	DB db;
-#endif
+	t_mktmpdir("./_testtmp");
+
+	DB db("./_testtmp/mtput", OWRITER | OCREATE | OTRUNCATE | OPARTITIONED);
+
 	const int NUM_KEYS = 30000;
 	const int NUM_THREADS = 8;
 	const int NUM_KEYS_PER_TH = NUM_KEYS / NUM_THREADS;

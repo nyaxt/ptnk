@@ -26,7 +26,6 @@ mysql storage engine known bugs:
 ptnk known issues list:
 
 VERY CRITICAL
-- PartitionedPageIO needs to be made thread safe
 - DupKey-tree compaction is not implemented! (may result in record-loss)
 
 CRITICAL
