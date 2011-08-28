@@ -1,6 +1,9 @@
-#include "fileutils.h"
+#include "sysutils.h"
 #include "exceptions.h"
 
+#include <unistd.h>
+#include <stdint.h>
+#include <sys/mman.h>
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <fcntl.h>
@@ -8,6 +11,25 @@
 
 namespace ptnk
 {
+
+bool
+ptr_valid(void* ptr)
+{
+	// cf. http://stackoverflow.com/questions/7134590/how-to-test-if-an-address-is-readable-in-linux-userspace-app
+
+	unsigned char t;
+	// FIXME below code assumes pagesize == 4096. use sysconf to obtain correct value
+	if(::mincore((void*)((uintptr_t)ptr & ~(uintptr_t)0xfff), 0xfff, &t) == 0)
+	{
+		return true;
+	}
+	else
+	{
+		if(errno == ENOMEM) return false;
+
+		PTNK_THROW_RUNTIME_ERR("mincore failed");
+	}
+}
 
 bool
 file_exists(const char* filename)

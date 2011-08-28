@@ -11,6 +11,7 @@
 #include "ptnk/btree_int.h"
 #include "ptnk/overview.h"
 #include "ptnk/tpio.h"
+#include "ptnk/sysutils.h"
 
 #include <iostream>
 
@@ -3564,15 +3565,23 @@ TEST(ptnk, PartitionedPageIO_basic)
 
 	// std::cout << "pgid: " << pgid2str(pgid) << std::endl;
 	// std::cout << "pg addr: " << (void*)pg.getRaw() << std::endl;
-	ASSERT_TRUE(pg.getRaw()) << "ptr of new page invalid";
+	ASSERT_TRUE(ptr_valid(pg.getRaw())) << "ptr of new page invalid";
 
 	Page pg2; page_id_t pgid2;
 	boost::tie(pg2, pgid2) = pio.newPage();
 
-	ASSERT_TRUE(pg2.getRaw()) << "ptr of new page2 invalid";
+	ASSERT_TRUE(ptr_valid(pg2.getRaw())) << "ptr of new page2 invalid";
 	ASSERT_NE(pgid, pgid2);
 	ASSERT_NE(pg.getRaw(), pg2.getRaw());
 	ASSERT_EQ(PTNK_PAGE_SIZE, pg2.getRaw() - pg.getRaw());
+
+	for(int i = 0; i < 2000; ++ i)
+	{
+		Page pg; page_id_t pgid;
+		boost::tie(pg, pgid) = pio.newPage();
+
+		ASSERT_TRUE(ptr_valid(pg.getRaw())) << "ptr of new page invalid. pgid: " << pgid2str(pgid);
+	}
 }
 
 TEST(ptnk, PartitionedPageIO_singlepart)

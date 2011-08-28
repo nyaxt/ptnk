@@ -149,7 +149,7 @@ def build(bld):
 		use = 'TCMALLOC PTHREAD BOOST_THREAD',
 		source = '''
 		ptnk/hash.cpp
-		ptnk/fileutils.cpp
+		ptnk/sysutils.cpp
 		ptnk/buffer.cpp
 		ptnk/page.cpp
 		ptnk/pageio.cpp

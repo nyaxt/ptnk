@@ -9,7 +9,7 @@
 #include "btree.h"
 #include "tpio.h"
 #include "overview.h"
-#include "fileutils.h"
+#include "sysutils.h"
 
 namespace ptnk
 {

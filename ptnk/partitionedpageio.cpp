@@ -1,6 +1,6 @@
 #include "partitionedpageio.h"
 #include "pageiomem.h"
-#include "fileutils.h"
+#include "sysutils.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -187,17 +187,17 @@ MappedFile::expandFile(size_t pgs)
 char*
 MappedFile::calcPtr(local_pgid_t pgid)
 {
-	int d = pgid;
+	int d = 0;
 
 	Mapping* p = &m_mapFirst;
 	for(;;)
 	{
 		if(PTNK_LIKELY(pgid < p->pgidLast))
 		{
-			return p->offset + PTNK_PAGE_SIZE * d;
+			return p->offset + PTNK_PAGE_SIZE * (pgid - d);
 		}
 
-		d -= p->pgidLast;
+		d = p->pgidLast;
 		p = p->next.get();
 		if(! p) PTNK_THROW_RUNTIME_ERR("page not mapped");
 	}
