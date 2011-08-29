@@ -186,22 +186,6 @@ MappedFile::expandFile(size_t pgs)
 	moreMMap(pgs);
 }
 
-char*
-MappedFile::calcPtr(local_pgid_t pgid)
-{
-	Mapping* p = &m_mapFirst;
-	for(;;)
-	{
-		if(PTNK_LIKELY(pgid < p->pgidEnd))
-		{
-			return p->offset + PTNK_PAGE_SIZE * pgid;
-		}
-
-		p = p->next.get();
-		if(! p) PTNK_THROW_RUNTIME_ERR("page not mapped");
-	}
-}
-
 void
 MappedFile::sync(local_pgid_t pgidStart, local_pgid_t pgidEnd)
 {

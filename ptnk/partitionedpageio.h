@@ -93,6 +93,19 @@ private:
 	local_pgid_t m_numPagesReserved;
 };
 
+inline
+char*
+MappedFile::calcPtr(local_pgid_t pgid)
+{
+	for(Mapping* p = &m_mapFirst; p; p = p->next.get())
+	{
+		if(PTNK_LIKELY(pgid < p->pgidEnd))
+		{
+			return p->offset + PTNK_PAGE_SIZE * pgid;
+		}
+	}
+}
+
 class PartitionedPageIO : public PageIO
 {
 public:
