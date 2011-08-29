@@ -546,6 +546,8 @@ PartitionedPageIO::syncRange(page_id_t pgidStart, page_id_t pgidEnd)
 	part_id_t partStart;
 	while(PTNK_UNLIKELY((partStart = PGID_PARTID(pgidStart)) != partEnd))
 	{
+		if(m_parts.is_null(partStart)) return;
+
 		m_parts[partStart].sync(
 			PGID_LOCALID(pgidStart), PTNK_LOCALID_INVALID
 			);

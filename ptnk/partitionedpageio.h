@@ -104,6 +104,8 @@ MappedFile::calcPtr(local_pgid_t pgid)
 			return p->offset + PTNK_PAGE_SIZE * pgid;
 		}
 	}
+
+	return NULL;
 }
 
 class PartitionedPageIO : public PageIO

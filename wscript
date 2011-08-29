@@ -107,7 +107,7 @@ def configure(conf):
 	# *** RELEASE
 	conf.setenv('rel', env=relenv)
 	conf.env.append_unique('CXXFLAGS', ['-O4'])
-	conf.env.append_unique('DEFINES', ['PTNK_USE_CUSTOM_MEMCMP']) # FIXME: add bench
+	conf.env.append_unique('DEFINES', ['BOOST_DISABLE_ASSERTS', 'NDEBUG', 'PTNK_USE_CUSTOM_MEMCMP']) # FIXME: add bench
 
 @TaskGen.feature('link_dtrace')
 @TaskGen.before('apply_link')
