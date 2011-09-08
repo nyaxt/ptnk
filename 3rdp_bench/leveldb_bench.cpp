@@ -7,7 +7,7 @@ using namespace leveldb;
 void
 run_bench()
 {
-	Bench b((boost::format("kc_bench %1%") % comment).str());
+	Bench b((boost::format("leveldb_bench %1%") % comment).str());
 	{
 		DB* db;
 		Options opts;

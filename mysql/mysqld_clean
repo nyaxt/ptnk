@@ -7,4 +7,5 @@ rm -rf $MYVAR/*
   echo "create database mysql;";
   echo "use mysql;";
   cat $SRCDIR/scripts/mysql_system_tables.sql $SRCDIR/scripts/mysql_system_tables_data.sql;
+  echo "update user set host='%' where host='127.0.0.1';"
 ) | mysqld --datadir=$MYVAR --basedir=$SHARE --lc-messages-dir=$SHARE --socket=$SOCKET --pid=$PIDFILE --bootstrap

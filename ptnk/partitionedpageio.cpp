@@ -143,7 +143,7 @@ MappedFile::moreMMap(size_t pgs)
 			std::cerr << "m_fd: " << m_fd<< std::endl;	
 		};
 	}
-	PTNK_ASSERT(offset);
+	PTNK_ASSERT(mapstart);
 
 	if(mapstart == hint)
 	{

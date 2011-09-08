@@ -78,7 +78,7 @@ private:
 	void copy_table_name(const char* name);
 
 	size_t pack_key_from_mysqlrow(KEY* key, uchar *buf, char* dest);
-	bool pack_key_from_mysqlkey(KEY* key, char* dest, size_t* szDest, const uchar* keyd, key_part_map keypart_map);
+	bool pack_key_from_mysqlkey(KEY* key, char* dest, size_t* szDest, const uchar* keyd, key_part_map keypart_map, int filler);
 
 	THR_LOCK_DATA lock;
 	myptnk_share* m_table_share;

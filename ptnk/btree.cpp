@@ -760,7 +760,6 @@ Node::refreshAllLeafPages_(void** cursor, page_id_t threshold, int numPages, pag
 		{
 			Leaf leafNew(pio->modifyPage(bc.leaf));
 			pio->sync(leafNew);
-			PTNK_ASSERT(mod.isValid());
 			
 			// propagate page w/ old link
 			// FIXME: below code dup from btree_put -> maybe include in btree_cursor_t?

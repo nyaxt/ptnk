@@ -760,7 +760,7 @@ ha_myptnk::delete_row(const uchar *buf)
 }
 
 bool
-ha_myptnk::pack_key_from_mysqlkey(KEY* key, char* dest, size_t* szDest, const uchar* keyd, key_part_map keypart_map)
+ha_myptnk::pack_key_from_mysqlkey(KEY* key, char* dest, size_t* szDest, const uchar* keyd, key_part_map keypart_map, int filler)
 {
 	bool bPackedAll = true;
 
@@ -839,39 +839,40 @@ ha_myptnk::pack_key_from_mysqlkey(KEY* key, char* dest, size_t* szDest, const uc
 
 		KEY_PART_INFO* key_part = &key->key_part[i];
 
-		if(key_part->null_bit)
-		{
-			*p++ = 0;
-		}
-
+		size_t flen = 0;
 		switch(key_part->field->type())
 		{
 		case MYSQL_TYPE_ENUM:
 		case MYSQL_TYPE_TINY:
-			*(unsigned char*)p = 0; p++;
+			flen = 1;
 			break;
 
 		case MYSQL_TYPE_SHORT:
-			*(unsigned short*)p = 0; p += 2;
+			flen = 2;
 			break;
 
 		case MYSQL_TYPE_LONG:
-			*(unsigned long*)p = 0; p += 4;
+			flen = 4;
 			break;
 
 		case MYSQL_TYPE_STRING:
 		case MYSQL_TYPE_VARCHAR:
-			{
-				size_t flen = key_part->field->row_pack_length(); // field length
-				::memset(p, 0, flen);
-				p += flen;
-			}
+			flen = key_part->field->row_pack_length(); // field length
 			break;
 
 		default:
 			DEBUG_OUTF("unknown key type: %d, storelen: %d\n", key_part->field->type(), key_part->store_length);
+			flen = key_part->store_length;
 			break;
 		}
+
+		if(key_part->null_bit)
+		{
+			++ flen;
+		}
+
+		::memset(p, filler, flen);
+		p += flen;
 	}
 
 	*szDest = p - dest;
@@ -906,28 +907,12 @@ ha_myptnk::index_read_map(uchar *buf, const uchar *key, key_part_map keypart_map
 	// pack active key
 	KEY* ki = &table->s->key_info[active_index];
 
-	char bufKey[256]; size_t sizeKey;
-	bool bPackedAll = pack_key_from_mysqlkey(ki, bufKey, &sizeKey, key, keypart_map);
-
-	ptnk_datum_t datumKey = {bufKey, sizeKey};
-
+	int filler = 0;
 	int qt = PTNK_MATCH_OR_NEXT;
 	switch(find_flag)
 	{
 	case HA_READ_KEY_EXACT:
-		if(bPackedAll)
-		{
-			qt = PTNK_MATCH_EXACT;
-		}
-		else
-		{
-			DEBUG_OUTF("exact match specified but relieving it to non-exact match as not all key_parts have been specified\n");
-
-			// not all key_parts have been specified	
-			// packed key for non-specified key_parts are zero-filled,
-			// so query type must be loosened to match them.
-			qt = PTNK_MATCH_OR_NEXT;
-		}
+		qt = PTNK_MATCH_EXACT;
 		break;
 
 	case HA_READ_KEY_OR_NEXT:
@@ -946,10 +931,38 @@ ha_myptnk::index_read_map(uchar *buf, const uchar *key, key_part_map keypart_map
 		qt = PTNK_BEFORE;
 		break;
 
+	case HA_READ_PREFIX:
+		qt = PTNK_MATCH_OR_NEXT;
+		break;
+	
+	case HA_READ_PREFIX_LAST:
+		filler = 255;
+		qt = PTNK_MATCH_OR_PREV;
+		break;
+
+	case HA_READ_PREFIX_LAST_OR_PREV:
+		filler = 255;
+		qt = PTNK_MATCH_OR_PREV;
+		break;
+
 	default:
 		DEBUG_OUTF("unsupported find_flag: %d\n", find_flag);
 		break;
 	};
+
+	char bufKey[256]; size_t sizeKey;
+	bool bPackedAll = pack_key_from_mysqlkey(ki, bufKey, &sizeKey, key, keypart_map, filler);
+	ptnk_datum_t datumKey = {bufKey, sizeKey};
+
+	if(!bPackedAll && qt == PTNK_MATCH_EXACT)
+	{
+		DEBUG_OUTF("exact match specified but relieving it to non-exact match as not all key_parts have been specified\n");
+
+		// not all key_parts have been specified	
+		// packed key for non-specified key_parts are zero-filled,
+		// so query type must be loosened to match them.
+		qt = PTNK_MATCH_OR_NEXT;
+	}
 
 	if(active_index == table->s->primary_key)
 	{
