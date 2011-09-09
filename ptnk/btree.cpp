@@ -14,6 +14,7 @@ static bool dktree_cursor_nextdkleaf(btree_cursor_t* cur, PageIO* pio);
 static bool dktree_cursor_prevdkleaf(btree_cursor_t* cur, PageIO* pio);
 static void dktree_cursor_front(btree_cursor_t* cur, PageIO* pio);
 static void dktree_cursor_back(btree_cursor_t* cur, PageIO* pio);
+static void dktree_insert_exactkey(Page pgDKTRoot, BufferCRef value, bool* bOvr, PageIO* pio);
 static page_id_t btree_propagate(btree_split_t& split, bool bPrevWasOvr, btree_cursor_t* cur, PageIO* pio);
 
 namespace 
@@ -1919,7 +1920,8 @@ Leaf::doSplit(const VKV& kvs, Leaf ovr, size_t thresSplit, btree_split_t* split,
 				dl.initBody(key);
 				for(int j = iKeyS; j < iKeyE; ++ j)
 				{
-					dl.addValue(kvs[j].second);
+					bool _;
+					dktree_insert_exactkey(dl, kvs[j].second, &_, pio);
 				}
 
 				if(! oldUsed)
@@ -2392,7 +2394,7 @@ DupKeyNode::insertR(BufferCRef value, bool* bOvr, PageIO* pio)
 	if(header().lvl > 0)
 	{
 		// * children of this node are DupKeyNodes
-	
+		
 		// find child node w/ ptr free
 		int iX = -1;
 		for(int i = 0; i < nPtr; ++ i)
@@ -2426,18 +2428,29 @@ DupKeyNode::insertR(BufferCRef value, bool* bOvr, PageIO* pio)
 				return true;
 			}
 		}
-		PTNK_ASSERT_CMNT(iX != -1, "child w/ MOSTFREE_TAG not found");
 
-		// try inserting to the node w/ most free ptrs in the list
-		DupKeyNode dnMostFree(pio->readPage(e(iX).ptr));
-
-		if(dnMostFree.insertR(value, bOvr, pio))
+		int szMostFree = 0;
+		if(iX != -1)
 		{
-			// insert success...
+			// child w/ MOST_FREE_TAG exist...
+			// try insert to the child
 
-			if(*bOvr) pio->notifyPageWOldLink(pageOrigId());
+			DupKeyNode dnMostFree(pio->readPage(e(iX).ptr));
 
-			return true;
+			if(dnMostFree.insertR(value, bOvr, pio))
+			{
+				// insert success...
+
+				if(*bOvr) pio->notifyPageWOldLink(pageOrigId());
+
+				return true;
+			}
+			
+			szMostFree = dnMostFree.ptrsFree();
+		}
+		else
+		{
+			PTNK_ASSERT(nPtr == 0);	
 		}
 
 		// add new node 
@@ -2453,7 +2466,8 @@ DupKeyNode::insertR(BufferCRef value, bool* bOvr, PageIO* pio)
 
 			DupKeyNode ovr(pio->modifyPage(*this, bOvr));
 			{
-				ovr.e(iX).sizeFree = dnMostFree.ptrsFree();
+				if(iX != -1) ovr.e(iX).sizeFree = szMostFree;
+
 				ovr.e(nPtr).ptr = dnNew.pageId();
 				ovr.e(nPtr).sizeFree = MOSTFREE_TAG;
 				++ ovr.header().nPtr;
@@ -2511,32 +2525,43 @@ DupKeyNode::insertR(BufferCRef value, bool* bOvr, PageIO* pio)
 				szSecondMostFree = o.sizeFree;	
 			}
 		}
-		PTNK_ASSERT_CMNT(iX != -1, "child w/ MOSTFREE_TAG not found");
 
-		// try inserting to the leaf w/ most free space in the list
-		DupKeyLeaf dlMostFree(pio->readPage(e(iX).ptr));
-
-		if(dlMostFree.insert(value, bOvr, pio))
+		int szMostFree = 0;
+		if(iX != -1)
 		{
-			if(*bOvr) pio->notifyPageWOldLink(pageOrigId());
+			// child leaf w/ MOST_FREE_TAG exist...
 
-			// check if dlMostFree is still the most free node
-			if(dlMostFree.sizeFree() < szSecondMostFree)
+			// try inserting to the leaf w/ most free space in the list
+			DupKeyLeaf dlMostFree(pio->readPage(e(iX).ptr));
+
+			if(dlMostFree.insert(value, bOvr, pio))
 			{
-				// dlMostFree is no longer the most free child...
-				PTNK_ASSERT(iSecondMostFree != -1);
+				if(*bOvr) pio->notifyPageWOldLink(pageOrigId());
 
-				DupKeyNode ovr(pio->modifyPage(*this, bOvr));
+				// check if dlMostFree is still the most free node
+				if(dlMostFree.sizeFree() < szSecondMostFree)
 				{
-					ovr.e(iX).sizeFree = dlMostFree.sizeFree();
-					ovr.e(iSecondMostFree).sizeFree = MOSTFREE_TAG;
+					// dlMostFree is no longer the most free child...
+					PTNK_ASSERT(iSecondMostFree != -1);
 
-					pio->sync(ovr);	
+					DupKeyNode ovr(pio->modifyPage(*this, bOvr));
+					{
+						ovr.e(iX).sizeFree = dlMostFree.sizeFree();
+						ovr.e(iSecondMostFree).sizeFree = MOSTFREE_TAG;
+
+						pio->sync(ovr);	
+					}
+
 				}
-
+				
+				return true;
 			}
-			
-			return true;
+
+			szMostFree = dlMostFree.sizeFree();
+		}
+		else
+		{
+			PTNK_ASSERT(nPtr == 0);	
 		}
 
 		// add new leaf
@@ -2552,10 +2577,34 @@ DupKeyNode::insertR(BufferCRef value, bool* bOvr, PageIO* pio)
 
 			DupKeyNode ovr(pio->modifyPage(*this, bOvr));
 			{
-				ovr.e(iX).sizeFree = dlMostFree.sizeFree();
-
 				ovr.e(nPtr).ptr = dlNew.pageId();
-				ovr.e(nPtr).sizeFree = MOSTFREE_TAG;
+
+				// set ovr.e(nPtr).sizeFree appropriately
+				// - leaf most free has to be tagged properly
+				if(iX != -1)
+				{
+					int szFree = dlNew.sizeFree();
+					
+					if(PTNK_LIKELY(szFree > szMostFree))
+					{
+						// new leaf has more capacity
+
+						ovr.e(iX).sizeFree = szMostFree;
+						ovr.e(nPtr).sizeFree = MOSTFREE_TAG;
+					}
+					else
+					{
+						// old leaf has more capacity
+
+						ovr.e(nPtr).sizeFree = szFree;
+					}
+				}
+				else
+				{
+					// this is the only leaf in the node
+					ovr.e(nPtr).sizeFree = MOSTFREE_TAG;
+				}
+
 				++ ovr.header().nPtr;
 
 				pio->sync(ovr);
@@ -2809,11 +2858,11 @@ btree_get(page_id_t pgidRoot, BufferCRef key, BufferRef value, PageIO* pio)
 }
 
 void
-dktree_insert_exactkey(btree_cursor_t* cur, BufferCRef value, bool* bOvr, PageIO* pio)
+dktree_insert_exactkey(Page pgDKTRoot, BufferCRef value, bool* bOvr, PageIO* pio)
 {
-	if(cur->leaf.pageType() == PT_DUPKEYLEAF)
+	if(pgDKTRoot.pageType() == PT_DUPKEYLEAF)
 	{
-		DupKeyLeaf dl(cur->leaf);
+		DupKeyLeaf dl(pgDKTRoot);
 		if(dl.insert(value, bOvr, pio))
 		{
 			// no leaf overflow...
@@ -2831,9 +2880,9 @@ dktree_insert_exactkey(btree_cursor_t* cur, BufferCRef value, bool* bOvr, PageIO
 	}
 	else /* if PT_DUPKEYNODE */
 	{
-		PTNK_ASSERT(cur->leaf.pageType() == PT_DUPKEYNODE);
+		PTNK_ASSERT(pgDKTRoot.pageType() == PT_DUPKEYNODE);
 
-		DupKeyNode(cur->leaf).insert(value, bOvr, pio);
+		DupKeyNode(pgDKTRoot).insert(value, bOvr, pio);
 	}
 }
 
@@ -2853,7 +2902,7 @@ dktree_insert(btree_cursor_t* cur, BufferCRef key, BufferCRef value, btree_split
 	int cmp = bufcmp(key, keyDK);
 	if(cmp == 0)
 	{
-		dktree_insert_exactkey(cur, value, bOvr, pio);
+		dktree_insert_exactkey(cur->leaf, value, bOvr, pio);
 	}
 	else if(PTNK_LIKELY(cmp > 0))
 	{

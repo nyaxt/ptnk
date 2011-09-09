@@ -750,7 +750,7 @@ TPIOTxSession::syncDelayed()
 			else
 			{
 				m_backend->syncRange(pgidFirst, pgidLast);
-				pgidFirst = pgid;
+				pgidLast = pgidFirst = pgid;
 			}
 		}
 		m_backend->syncRange(pgidFirst, pgidLast);

@@ -2085,6 +2085,56 @@ TEST(ptnk, dupkey_tree_10k)
 	}
 }
 
+TEST(ptnk, dupkey_tree_massive)
+{
+	boost::scoped_ptr<PageIO> pio(new PageIOMem);
+
+	page_id_t idRoot = btree_init(pio.get());
+
+	BufferCRef dupkey = cstr2ref("dupkey");
+	static const int DUPKEY_COUNT = 10000;
+	char value[256];
+	for(int j = 0; j < 256; ++ j)
+	{
+		value[j] = (char)(j&0x7f);
+	}
+	for(int i = 0; i < DUPKEY_COUNT; ++ i)
+	{
+		idRoot = btree_put(idRoot, dupkey, BufferCRef(value, sizeof(value)), PUT_INSERT, PGID_INVALID, pio.get());
+	}
+
+	Buffer k, v;
+
+	// front -> back scan
+	btree_cursor_wrap cur;
+	btree_cursor_front(cur.get(), idRoot, pio.get());
+	for(int i = 0; i < DUPKEY_COUNT; ++ i)
+	{
+		btree_cursor_get(k.wref(), k.pvalsize(), v.wref(), v.pvalsize(), cur.get(), pio.get());
+		k.makeNullTerm();
+		EXPECT_TRUE(k.isValid());
+		EXPECT_STREQ(k.get(), "dupkey");
+		EXPECT_TRUE(v.isValid());
+		EXPECT_TRUE(::memcmp(v.get(), value, sizeof(value)) == 0) << "value at " << i;
+
+		ASSERT_EQ(i != DUPKEY_COUNT-1, btree_cursor_next(cur.get(), pio.get()));
+	}
+
+	// back -> front
+	btree_cursor_back(cur.get(), idRoot, pio.get());
+	for(int i = 0; i < DUPKEY_COUNT; ++ i)
+	{
+		btree_cursor_get(k.wref(), k.pvalsize(), v.wref(), v.pvalsize(), cur.get(), pio.get());
+		k.makeNullTerm();
+		EXPECT_TRUE(k.isValid());
+		EXPECT_STREQ(k.get(), "dupkey");
+		EXPECT_TRUE(v.isValid());
+		EXPECT_TRUE(::strncmp(v.get(), value, sizeof(value)) == 0) << "value at " << i;
+
+		ASSERT_EQ(i != DUPKEY_COUNT-1, btree_cursor_prev(cur.get(), pio.get())) << "i: " << i;
+	}
+}
+
 TEST(ptnk, btree_many_dupkeys)
 {
 	boost::scoped_ptr<PageIO> pio(new PageIOMem);

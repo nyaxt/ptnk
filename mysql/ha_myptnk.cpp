@@ -468,7 +468,6 @@ ha_myptnk::pack_key_from_mysqlrow(KEY* key, uchar *buf, char* dest)
 			// memo: key_part->field can't be used here AND key_part->field != table->field[key_part->fieldnr-1]
 			//       its field->table->s is nil, causing SEGV in pack member func. 
 			Field* field = table->field[key_part->fieldnr - 1 /* offset 1 */];
-			// p = (char*)field->pack((uchar*)p, buf + field->offset(buf));
 			switch(field->type())
 			{
 			case MYSQL_TYPE_LONG:
@@ -1179,15 +1178,17 @@ ha_myptnk::rnd_next(uchar *buf)
 		const char* p = value.dptr;
 
 		// copy bitmap for null fields (null_bytes)
-		::memcpy(buf, p, table->s->null_bytes);
-		p += table->s->null_bytes;
+		size_t null_bytes = table_share->null_bytes;
+		::memcpy(buf, p, null_bytes);
+		p += null_bytes;
 
 		// unpack each field
-		const int nfields = table->s->fields;
+		const int nfields = table_share->fields;
+		Field** fields = table->field;
 		for(int i = 0; i < nfields; ++ i)
 		{
-			Field* field = table->field[i];
-			p = (char*)field->unpack(buf + field->offset(buf), (uchar*)p);
+			Field* f = fields[i];
+			p = (char*)f->unpack(buf + f->offset(buf), (uchar*)p);
 		}
 		DEBUG_OUTF("unpacked buffer: %lu\n", p - value.dptr);
 		DEBUG_OUTF("value size: %lu\n", value.dsize);

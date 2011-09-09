@@ -1,15 +1,21 @@
 #!/bin/bash
 ./update_build $@ || exit
 
-if [ "$1" == "-d" ]; then
-	DEBUG_OPTS=-#d:t:F
-fi
+while getopts "dg" flag; do
+	case $flag in
+	g) GDB=on ;;
+	d) DEBUG_OPTS=-#d:t:F ;;
+	esac
+done
 
 . ./mysqld_vars
 
+if [ "$GDB" == "on" ]; then
+gdb --args mysqld --skip-stack-trace --datadir=$MYVAR --basedir=$SHARE --lc-messages-dir=$SHARE --socket=$SOCKET --pid=$PIDFILE $DEBUG_OPTS
+else
 trap 'killall mysqld; exit' 2 3 9 15
-
-mysqld --datadir=$MYVAR --basedir=$SHARE --lc-messages-dir=$SHARE --socket=$SOCKET --pid=$PIDFILE $DEBUG_OPTS 2>&1 | tee mysqld.log | grep ptnk &
+mysqld --core-file --datadir=$MYVAR --basedir=$SHARE --lc-messages-dir=$SHARE --socket=$SOCKET --pid=$PIDFILE $DEBUG_OPTS 2>&1 | tee mysqld.log | grep ptnk &
 sleep 3
 mysql -u root -S $SOCKET
 killall mysqld
+fi
