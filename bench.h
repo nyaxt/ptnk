@@ -2,85 +2,13 @@
 #define _bench_h_
 
 #include "ptnk_config.h"
+#include "ptnk/sysutils.h"
+using ptnk::HighResTimeStamp;
 
 #include <iostream>
 #include <iomanip>
 #include <boost/format.hpp>
 #include <boost/foreach.hpp>
-#include <time.h>
-#include <sys/time.h>
-
-#ifdef USE_MACH_ABSOLUTE_TIME
-#include <mach/mach_time.h>
-#endif
-
-#ifndef NSEC_PER_SEC
-# define NSEC_PER_SEC                   1000000000ULL
-# define NSEC_PER_USEC                  1000ULL
-#endif
-
-class HighResTimeStamp
-{
-public:
-	HighResTimeStamp()
-	{
-		reset();
-	}
-
-#ifdef USE_CLOCK_GETTIME
-	void reset()
-	{
-		::clock_gettime(CLOCK_MONOTONIC, &m_impl);
-	}
-
-	unsigned long elapsed_ns(const HighResTimeStamp& start)
-	{
-		unsigned long ret;
-
-		ret = (unsigned long)(m_impl.tv_sec - start.m_impl.tv_sec)*NSEC_PER_SEC;
-		ret += (unsigned long)(m_impl.tv_nsec - start.m_impl.tv_nsec);
-		
-		return ret;
-	}
-		
-private:
-	struct timespec m_impl;
-
-#elif defined(USE_MACH_ABSOLUTE_TIME)
-	void reset()
-	{
-		m_impl = ::mach_absolute_time();
-	}
-	
-	unsigned long elapsed_ns(const HighResTimeStamp& start)
-	{
-		mach_timebase_info_data_t base; ::mach_timebase_info(&base);
-		return (m_impl - start.m_impl) * base.numer / base.denom;
-	}
-
-private:
-	uint64_t m_impl;
-#else // fallback to gettimeofday
-	void reset()
-	{
-		::gettimeofday(&m_impl, NULL);			
-	}
-
-	unsigned long elapsed_ns(const HighResTimeStamp& start)
-	{
-		unsigned long ret;
-
-		ret = (unsigned long)(m_impl.tv_sec - start.m_impl.tv_sec)*NSEC_PER_SEC;
-		ret += (unsigned long)(m_impl.tv_usec - start.m_impl.tv_usec)*NSEC_PER_USEC;
-		
-		return ret;
-	}
-
-private:
-	struct timeval m_impl;
-#endif
-};
-
 
 class Bench 
 {

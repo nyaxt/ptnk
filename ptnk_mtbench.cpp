@@ -1,4 +1,5 @@
 #include "bench_tmpl.h"
+#include "ptnk/sysutils.h"
 #include "ptnk.h"
 
 #include <boost/thread.hpp>
@@ -81,4 +82,6 @@ run_bench()
 	}
 	b.end();
 	b.dump();
+
+	MutexProf::dumpStatAll();
 }

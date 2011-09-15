@@ -1,4 +1,5 @@
 #include "tpio.h"
+#include "sysutils.h"
 #include "hash.h"
 #include "streak.h"
 
@@ -576,7 +577,10 @@ TPIO::newTransaction()
 TPIOTxSession::TPIOTxSession(TPIO* tpio, session_type_t type)
 :	m_tpio(tpio), m_backend(tpio->m_backend.get()), m_txid(TXID_INVALID), m_type(type), m_numUniquePagesLocal(0)
 {
+	MUTEXPROF_START("TPIOTxSession C-tor");
 	boost::shared_lock<boost::shared_mutex> g(tpio->m_mtxState);
+	MUTEXPROF_END;
+
 	m_state = tpio->m_stateTip;
 }
 
@@ -803,7 +807,9 @@ TPIOTxSession::tryCommit()
 		if(m_type != SESSION_REBASE)
 		{
 			// rebase tx have already m_mtx locked
+			MUTEXPROF_START("tryCommit m_tpio->m_mtx");
 			g.lock();
+			MUTEXPROF_END;
 		}
 
 		if(m_type != SESSION_REFRESH)
@@ -829,7 +835,10 @@ TPIOTxSession::tryCommit()
 
 		if(m_type == SESSION_REBASE)
 		{
+			MUTEXPROF_START("tryCommit SESSION_REBASE m_tpio->m_mtxState (excl)");
 			boost::unique_lock<boost::shared_mutex> gt(m_tpio->m_mtxState);
+			MUTEXPROF_END;
+
 			verTx = m_tpio->m_stateTip.ver + 1;
 			PTNK_ASSERT(verTx > m_state.ver);
 			PTNK_ASSERT(verTx > m_state.verBase);
@@ -847,7 +856,10 @@ TPIOTxSession::tryCommit()
 		}
 		else
 		{
+			MUTEXPROF_START("tryCommit non-SESSION_REBASE m_tpio->m_mtxState");
 			boost::upgrade_lock<boost::shared_mutex> gt(m_tpio->m_mtxState);
+			MUTEXPROF_END;
+
 			if(m_tpio->m_stateTip.verBase != m_state.verBase)
 			{
 				// tx should not cross rebase
@@ -861,7 +873,10 @@ TPIOTxSession::tryCommit()
 			m_tpio->m_ovrs.merge(m_ovrsTxLocal, m_state.verBase, m_state.ver, verTx);
 
 			{
+				MUTEXPROF_START("tryCommit non-SESSION_REBASE m_tpio->m_mtxState (excl)");
 				boost::upgrade_to_unique_lock<boost::shared_mutex> gtu(gt);
+				MUTEXPROF_END;
+
 				m_tpio->m_stateTip.ver = verTx;
 				m_tpio->m_stateTip.pgidStartPage = pgidStartPage();
 				m_tpio->m_numUniquePages += m_numUniquePagesLocal;

@@ -1,4 +1,5 @@
 #include "pageiomem.h"
+#include "sysutils.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -233,7 +234,9 @@ RETRY:
 #ifdef VERBOSE_PAGEIOMEM
 		std::cout << "running out of space" << std::endl;
 #endif
+		MUTEXPROF_START("alloc new map");
 		boost::lock_guard<boost::mutex> g(m_mtxAllocNewMapping);
+		MUTEXPROF_END;
 
 		// make sure that other thread has not already alloced pages
 		ssize_t numNeeded = m_idNext - m_numPagesReserved + 1;

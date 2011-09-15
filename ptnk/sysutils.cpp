@@ -1,6 +1,7 @@
 #include "sysutils.h"
 #include "exceptions.h"
 
+#include <iostream>
 #include <unistd.h>
 #include <stdint.h>
 #include <sys/mman.h>
@@ -9,8 +10,34 @@
 #include <fcntl.h>
 #include <errno.h>
 
+#include <boost/foreach.hpp>
+
 namespace ptnk
 {
+
+std::vector<MutexProf*> MutexProf::s_profs;
+
+MutexProf::MutexProf(const char* strid)
+:	m_strid(strid),
+	m_totalWaitLock(0)
+{
+	s_profs.push_back(this);	
+}
+
+void
+MutexProf::dumpStat()
+{
+	std::cerr << m_strid << ":\t" << m_totalWaitLock/NSEC_PER_USEC << "us" << std::endl;
+}
+
+void
+MutexProf::dumpStatAll()
+{
+	BOOST_FOREACH(MutexProf* prof, s_profs)
+	{
+		prof->dumpStat();
+	}
+}
 
 bool
 ptr_valid(void* ptr)
