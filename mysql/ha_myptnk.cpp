@@ -219,6 +219,8 @@ struct myptnk_share
 
 	int open(int mode)
 	{
+		mutex_wrap::guard g(mtx);
+
 		if(ptnkdb)
 		{
 			DEBUG_OUTF("ptnkdb already opened\n");
@@ -233,6 +235,8 @@ struct myptnk_share
 
 	int dropdb()
 	{
+		mutex_wrap::guard g(mtx);
+
 		if(! ::ptnk_drop_db(dbfilepath))
 		{
 			return ER_CANT_OPEN_FILE;
