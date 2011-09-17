@@ -2688,7 +2688,7 @@ TEST(ptnk, OverridesCB_getSpaceLeft)
 		ovrs.add(3, 4);
 		
 		EXPECT_TRUE(ocb.checkConflict(ovrs, 1, 1, hint));
-		ocb.merge(ovrs, 1, 1, 2);
+		ocb.merge(ovrs, 1, 2);
 	}
 	EXPECT_EQ(OverridesCB::BUF_SIZE - 1 - 3, ocb.getSpaceLeft(1, hint));
 	
@@ -2701,7 +2701,7 @@ TEST(ptnk, OverridesCB_getSpaceLeft)
 		}
 
 		EXPECT_TRUE(ocb.checkConflict(ovrs, 2, 2, hint));
-		ocb.merge(ovrs, 2, 2, 3);
+		ocb.merge(ovrs, 2, 3);
 	}
 	EXPECT_EQ(OverridesCB::BUF_SIZE - 1 - OverridesCB::BUF_SIZE/2, ocb.getSpaceLeft(1, hint));
 
@@ -2714,7 +2714,7 @@ TEST(ptnk, OverridesCB_getSpaceLeft)
 		}
 
 		EXPECT_TRUE(ocb.checkConflict(ovrs, 3, 3, hint));
-		ocb.merge(ovrs, 3, 3, 4);
+		ocb.merge(ovrs, 3, 4);
 	}
 	EXPECT_EQ(-1, ocb.getSpaceLeft(1, hint));
 	EXPECT_EQ(OverridesCB::BUF_SIZE - 1 - OverridesCB::BUF_SIZE/2, ocb.getSpaceLeft(4, hint));

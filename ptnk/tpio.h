@@ -74,7 +74,7 @@ public:
 	bool filterConflict(OverridesV& v, tx_id_t verBase, tx_id_t verSS, hint_t hint = -1) const;
 
 	//! merge overrides
-	void merge(const OverridesV& v, tx_id_t verBase, tx_id_t verSS, tx_id_t verTx);
+	void merge(const OverridesV& v, tx_id_t verBase, tx_id_t verTx);
 
 	//! add entry (add via OverridesV instead where possible)
 	void add(page_id_t orig, page_id_t ovr, tx_id_t ver);

@@ -178,11 +178,21 @@ return ret1;
 			const entry_t& e = m_cb[i];
 			if(e.ver < verBase) break;
 
-			if(e.orig == orig && e.ver <= ver)
+			if(e.orig == orig)
 			{
-				ret2 = e.ovr;
-				break;
+				if(e.ver <= ver)
+				{
+					// valid ovr entry found
+					ret2 = e.ovr;
+					break;
+				}
+				else
+				{
+					// found ovrpg after the entry! modifyPage on this pg will conflict!
+				}
 			}
+
+			// hash collision!
 
 			if(schash(e.orig) != hash) break;
 
@@ -219,18 +229,39 @@ OverridesCB::checkConflict(const OverridesV& v, tx_id_t verBase, tx_id_t verSS, 
 		return false;
 	}
 
-	int i, iE = m_idxNext+1;
-	OverridesCB_forallr_m_cb(i, iE, {
-		const entry_t& eCB = m_cb[i];
+	BOOST_FOREACH(const OverridesV::entry_t& e, v.m_v)
+	{
+		unsigned int hash = schash(e.orig);
+		int i = m_shortcut[hash];
 
-		if(eCB.ver <= verSS) break;
-
-		BOOST_FOREACH(const OverridesV::entry_t& e, v.m_v)
+		bool looped = false;
+		for(;;)
 		{
-			// detect collision!
-			if(eCB.orig == e.orig) return false;
+			if(i < 0) break;
+
+			const entry_t& eCB = m_cb[i];
+			if(eCB.ver <= verSS) break;
+
+			if(eCB.orig == e.orig)
+			{
+				return false;
+			}
+
+			// hash collision!
+
+			if(schash(eCB.orig) != hash) break;
+
+			// avoid inf loop
+			if(i == eCB.idxPrevHash) break;
+			if(i < eCB.idxPrevHash)
+			{
+				if(looped) break;
+				looped = true;	
+			}
+
+			i = eCB.idxPrevHash;
 		}
-	})
+	}
 
 	return true;
 }
@@ -279,10 +310,8 @@ OverridesCB::filterConflict(OverridesV& v, tx_id_t verBase, tx_id_t verSS, hint_
 }
 
 void
-OverridesCB::merge(const OverridesV& v, tx_id_t verBase, tx_id_t verSS, tx_id_t verTx)
+OverridesCB::merge(const OverridesV& v, tx_id_t verBase, tx_id_t verTx)
 {
-	// PTNK_ASSERT(checkConflict(v, verBase, verSS));
-
 	BOOST_FOREACH(const OverridesV::entry_t& e, v.m_v)
 	{
 		if(e.ovr == PGID_INVALID) continue;
@@ -870,7 +899,7 @@ TPIOTxSession::tryCommit()
 			PTNK_ASSERT(verTx > m_state.verBase);
 
 			// merge ovr -> TPIO
-			m_tpio->m_ovrs.merge(m_ovrsTxLocal, m_state.verBase, m_state.ver, verTx);
+			m_tpio->m_ovrs.merge(m_ovrsTxLocal, m_state.verBase, verTx);
 
 			{
 				MUTEXPROF_START("tryCommit non-SESSION_REBASE m_tpio->m_mtxState (excl)");
