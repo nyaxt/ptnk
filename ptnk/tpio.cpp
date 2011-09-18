@@ -136,7 +136,7 @@ OverridesCB::add(page_id_t orig, page_id_t ovr, tx_id_t ver)
 	}
 
 page_id_t
-OverridesCB::find(page_id_t orig, tx_id_t verBase, tx_id_t ver, hint_t hint) const
+OverridesCB::find(page_id_t orig, tx_id_t verBase, tx_id_t ver) const
 {
 	if(verBase <= m_verDamaged)
 	{
@@ -220,7 +220,7 @@ return ret1;
 }
 
 bool
-OverridesCB::checkConflict(const OverridesV& v, tx_id_t verBase, tx_id_t verSS, hint_t hint) const
+OverridesCB::checkConflict(const OverridesV& v, tx_id_t verBase, tx_id_t verSS) const
 {
 	// FIXME: nested loop conflict check -> inefficient...
 	if(verBase <= m_verDamaged)
@@ -267,7 +267,7 @@ OverridesCB::checkConflict(const OverridesV& v, tx_id_t verBase, tx_id_t verSS, 
 }
 
 bool
-OverridesCB::filterConflict(OverridesV& v, tx_id_t verBase, tx_id_t verSS, hint_t hint) const
+OverridesCB::filterConflict(OverridesV& v, tx_id_t verBase, tx_id_t verSS) const
 {
 	// FIXME: nested loop conflict check -> inefficient...
 	if(verBase <= m_verDamaged)
@@ -832,6 +832,54 @@ TPIOTxSession::tryCommit()
 	tx_id_t verTx;
 	uint64_t numUniquePages;
 	{
+		if(m_type != SESSION_RERESH)
+		{
+			tx_id_t verCheck;
+			do
+			{
+				verCheck = m_tpio->m_stateTip.ver;
+				if(! m_tpio->m_ovrs.checkConflict(m_ovrsTxLocal, m_state.verBase, m_state.ver))
+				{
+					// tx fail
+					++ m_stat.nCommitFail;
+
+					return false;
+				}
+				m_state.ver = verCheck;	
+			}
+			while(m_tpio->m_stateTip.ver != verCheck)
+
+			MUTEXPROF_START("tryCommit non-SESSION_REBASE m_tpio->m_mtxState");
+			boost::upgrade_lock<boost::shared_mutex> gt(m_tpio->m_mtxState);
+			MUTEXPROF_END;
+
+			if(m_tpio->m_stateTip.verBase != m_state.verBase)
+			{
+				// tx should not cross rebase
+				return false;
+			}
+			verTx = m_tpio->m_stateTip.ver + 1;
+			PTNK_ASSERT(verTx > m_state.ver);
+			PTNK_ASSERT(verTx > m_state.verBase);
+
+			// merge ovr -> TPIO
+			m_tpio->m_ovrs.merge(m_ovrsTxLocal, m_state.verBase, verTx);
+
+			{
+				MUTEXPROF_START("tryCommit non-SESSION_REBASE m_tpio->m_mtxState (excl)");
+				boost::upgrade_to_unique_lock<boost::shared_mutex> gtu(gt);
+				MUTEXPROF_END;
+
+				m_tpio->m_stateTip.ver = verTx;
+				m_tpio->m_stateTip.pgidStartPage = pgidStartPage();
+				m_tpio->m_numUniquePages += m_numUniquePagesLocal;
+				numUniquePages = m_tpio->m_numUniquePages;
+			}
+			gt.unlock();
+
+			m_tpio->m_oldlink.merge(m_oldlinkLocal);
+		}
+
 		boost::unique_lock<boost::mutex> g(m_tpio->m_mtx, boost::defer_lock_t());
 		if(m_type != SESSION_REBASE)
 		{
@@ -843,7 +891,7 @@ TPIOTxSession::tryCommit()
 
 		if(m_type != SESSION_REFRESH)
 		{
-			if(! m_tpio->m_ovrs.checkConflict(m_ovrsTxLocal, m_state.verBase, m_state.ver, m_state.ovrshint))
+			if(! m_tpio->m_ovrs.checkConflict(m_ovrsTxLocal, m_state.verBase, m_state.ver))
 			{
 				// tx fail
 				++ m_stat.nCommitFail;
@@ -853,7 +901,7 @@ TPIOTxSession::tryCommit()
 		}
 		else // if m_type == SESSION_REFRESH
 		{
-			if(! m_tpio->m_ovrs.filterConflict(m_ovrsTxLocal, m_state.verBase, m_state.ver, m_state.ovrshint))
+			if(! m_tpio->m_ovrs.filterConflict(m_ovrsTxLocal, m_state.verBase, m_state.ver))
 			{
 				// tx fail
 				++ m_stat.nCommitFail;
@@ -966,7 +1014,7 @@ TPIO::RebaseTPIOTxSession::updateLink(page_id_t idOld)
 	page_id_t idL = m_ovrsTxLocal.find(idOld);
 	if(idL != idOld) return idL;
 
-	page_id_t idO = m_tpio->m_ovrs.find(idOld, m_state.verBase, m_state.ver, m_state.ovrshint);
+	page_id_t idO = m_tpio->m_ovrs.find(idOld, m_state.verBase, m_state.ver);
 	if(idO != idOld) return idO;
 	
 	return idOld;

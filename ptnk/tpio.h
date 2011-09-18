@@ -62,16 +62,16 @@ public:
 	~OverridesCB();
 
 	typedef int hint_t;
-	page_id_t find(page_id_t orig, tx_id_t verBase = (page_id_t)(~0), tx_id_t ver = (page_id_t)(~0), hint_t hint = -1) const;
+	page_id_t find(page_id_t orig, tx_id_t verBase = (page_id_t)(~0), tx_id_t ver = (page_id_t)(~0)) const;
 
 	//! check for conflict
 	/*!
 	 *	@return
 	 *		true if no conflict detected
 	 */
-	bool checkConflict(const OverridesV& v, tx_id_t verBase, tx_id_t verSS, hint_t hint = -1) const;
+	bool checkConflict(const OverridesV& v, tx_id_t verBase, tx_id_t verSS) const;
 
-	bool filterConflict(OverridesV& v, tx_id_t verBase, tx_id_t verSS, hint_t hint = -1) const;
+	bool filterConflict(OverridesV& v, tx_id_t verBase, tx_id_t verSS) const;
 
 	//! merge overrides
 	void merge(const OverridesV& v, tx_id_t verBase, tx_id_t verTx);
@@ -413,7 +413,7 @@ private:
 	PagesOldLink m_oldlink;
 
 	boost::shared_mutex m_mtxState;
-	SnapshotState m_stateTip;
+	volatile SnapshotState m_stateTip;
 
 	uint64_t m_numUniquePages;
 };
