@@ -1,9 +1,12 @@
 #include <iostream>
 
 #include "../ptnk/bitvector.h"
+#include "../ptnk/page.h"
 
 namespace ptnk
 {
+
+typedef tx_id_t ver_t;
 
 namespace stm
 {
@@ -23,23 +26,14 @@ struct OvrEntry
 
 inline int pgidhash(page_id_t pgid)
 {
-	return page % TPIO_NHASH;
+	return pgid % TPIO_NHASH;
 }
 
-__attribute__ ((aligned (8)))
-class LocalOvr
+class __attribute__ ((aligned (8))) LocalOvr
 {
 public:
 	page_id_t searchOvr(page_id_t pgid);
 	void newOvr(page_id_t pgidOrig, page_id_t pgidOvr);
-
-	ver_t getVer() const
-	{
-		return m_verWrite;	
-	}
-
-	//! set tx id of this tx and update ver field of OvrEntry this holds
-	void setVer(ver_t ver);
 
 private:
 	enum { TAG_TXVER_LOCAL = 0 };
@@ -53,7 +47,8 @@ private:
 	ver_t m_verWrite;
 
 	friend class ActiveOvr;
-	LocalOvr m_prev;
+	bool checkConflict(LocalOvr* other);
+	LocalOvr* m_prev;
 	bool m_mergeOngoing;
 	bool m_merged;
 };
@@ -64,6 +59,8 @@ public:
 	bool tryCommit(LocalOvr* lovr);
 
 private:
+	void merge(LocalOvr* lovr);
+
 	OvrEntry* m_ovrs[TPIO_NHASH];
 
 	//! latest verified tx
@@ -81,7 +78,10 @@ LocalOvr::searchOvr(page_id_t pgid)
 
 	while(e)
 	{
-		if(e->ver > m_verSS) break;
+		if(e->ver > m_verRead)
+		{
+			continue;
+		}
 
 		if(e->pgidOrig == pgid)
 		{
@@ -102,24 +102,9 @@ LocalOvr::newOvr(page_id_t pgidOrig, page_id_t pgidOvr)
 	e->pgidOvr = pgidOvr;
 	e->ver = TAG_TXVER_LOCAL;
 
-	int h = pgidhash(pgid);
+	int h = pgidhash(pgidOrig);
 	e->prev = m_ovrsLocal[h];
 	m_ovrsLocal[h] = e;
-}
-
-void
-LocalOvr::applyVerWrite()
-{
-	const ver_t verWrite = m_verWrite;
-
-	// set ver field for my local ovrs
-	for(int i = 0; i < TPIO_NHASH; ++ i)
-	{
-		for(e = m_ovrsLocal[i]; e && e->ver == TAG_TXVER_LOCAL; e = e->prev)
-		{
-			e->ver = verWrite;
-		}
-	}
 }
 
 bool
@@ -175,13 +160,14 @@ ActiveOvr::tryCommit(LocalOvr* lovr)
 			lovrsUnmerged.push_back(o);
 		}
 
+		// step 3.2: merge txs older one first
 		typedef std::vector<LocalOvr*>::const_reverse_iterator it_t;
 		for(it_t it = lovrsUnmerged.rbegin(); it != lovrsUnmerged.rend(); ++ it)
 		{
 			LocalOvr* o = *it;
 
 			if(o->m_merged)	continue; // skip merged tx
-			concurrentMerge(o);
+			merge(o);
 		}
 	}
 
@@ -189,12 +175,16 @@ ActiveOvr::tryCommit(LocalOvr* lovr)
 }
 
 void
-ActiveOvr::concurrentMerge(LocalOvr* lovr)
+ActiveOvr::merge(LocalOvr* lovr)
 {
 	// FIXME: really implement the concurrent merge
 	if(! __sync_bool_compare_and_swap(&lovr->m_mergeOngoing, false, true))
 	{
-		while(! lovr->m_merged); // wait until merge complete
+		// wait until merge complete
+		while(! lovr->m_merged)
+		{
+			 asm volatile("": : :"memory"); // force re-read
+		}
 
 		return;
 	}
