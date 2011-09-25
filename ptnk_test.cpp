@@ -2671,7 +2671,6 @@ TEST(ptnk, overridesv)
 
 	ovrs.add(1, 3);
 	EXPECT_EQ((page_id_t)3, ovrs.find(1));
-	// EXPECT_EQ((page_id_t)3, ovrs.find(2)); // dousiyou
 }
 
 TEST(ptnk, OverridesCB_getSpaceLeft)

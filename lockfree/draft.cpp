@@ -23,6 +23,13 @@ struct OvrEntry
 
 	OvrEntry* prev;
 };
+std::ostream& operator<<(std::ostream& s, const OvrEntry& e);
+
+std::ostream&
+operator<<(std::ostream& s, const OvrEntry& e)
+{
+	s << "[orig " << e.pgidOrig << " -> ovr " << e.pgidOvr << " | ver: " << e.ver << " prev: " << (void*)e.prev << "]";
+}
 
 inline int pgidhash(page_id_t pgid)
 {
@@ -48,13 +55,18 @@ private:
 class __attribute__ ((aligned (8))) LocalOvr
 {
 public:
+	LocalOvr(OvrEntry* hashOvrs[], ver_t verRead);
+
 	page_id_t searchOvr(page_id_t pgid);
-	void newOvr(page_id_t pgidOrig, page_id_t pgidOvr);
+	void addOvr(page_id_t pgidOrig, page_id_t pgidOvr);
+
+	void dump(std::ostream& s) const;
 
 private:
 	enum { TAG_TXVER_LOCAL = 0 };
 
-	std::vector<OvrEntry> m_ovrsLocal;
+	Vpage_id_t m_pgidOrigs;
+	Vpage_id_t m_pgidOvrs;
 
 	OvrEntry* m_hashOvrs[TPIO_NHASH];
 
@@ -73,15 +85,32 @@ private:
 	bool m_merged;
 };
 
+std::ostream& operator<<(std::ostream& s, const LocalOvr& o)
+{
+	o.dump(s);
+	return s;
+}
+
 class ActiveOvr
 {
 public:
+	ActiveOvr();
+
+	LocalOvr* newTx();
 	bool tryCommit(LocalOvr* lovr);
+	bool tryCommit(std::unique_ptr<LocalOvr>& lovr)
+	{
+		bool ret = tryCommit(lovr.get());
+		if(ret) lovr.reset();
+		return ret;
+	}
 
 private:
 	void merge(LocalOvr* lovr);
 
 	OvrEntry* m_hashOvrs[TPIO_NHASH];
+
+	ver_t m_verRebase;
 
 	//! latest verified tx
 	/*!
@@ -89,6 +118,33 @@ private:
 	 */
 	LocalOvr* m_lovrVerifiedTip;
 };
+
+ActiveOvr::ActiveOvr()
+:	m_lovrVerifiedTip(NULL),
+	m_verRebase(1)
+{
+	for(int i = 0; i < TPIO_NHASH; ++ i)
+	{
+		m_hashOvrs[i] = NULL;	
+	}
+}
+
+LocalOvr*
+ActiveOvr::newTx()
+{
+	return new LocalOvr(m_hashOvrs, m_lovrVerifiedTip ? m_lovrVerifiedTip->m_verWrite : m_verRebase);
+}
+
+LocalOvr::LocalOvr(OvrEntry* hashOvrs[], ver_t verRead)
+:	m_verRead(verRead), m_verWrite(0),
+	m_prev(NULL),
+	m_mergeOngoing(false), m_merged(false)
+{
+	for(int i = 0; i < TPIO_NHASH; ++ i)
+	{
+		m_hashOvrs[i] = hashOvrs[i];
+	}
+}
 
 page_id_t
 LocalOvr::searchOvr(page_id_t pgid)
@@ -100,6 +156,7 @@ LocalOvr::searchOvr(page_id_t pgid)
 	{
 		if(e->ver > m_verRead)
 		{
+			// ovr entry is newer than read snapshot
 			continue;
 		}
 
@@ -115,20 +172,21 @@ LocalOvr::searchOvr(page_id_t pgid)
 }
 
 void
-LocalOvr::newOvr(page_id_t pgidOrig, page_id_t pgidOvr)
+LocalOvr::addOvr(page_id_t pgidOrig, page_id_t pgidOvr)
 {
-	// add entry to m_ovrsLocal
+	// add entry to m_pgidOrigs / Ovrs
 	{
-		OvrEntry e;
-		e.pgidOrig = pgidOrig;
-		e.pgidOvr = pgidOvr;
-		e.ver = TAG_TXVER_LOCAL;
-		m_ovrsLocal.push_back(e);
+		m_pgidOrigs.push_back(pgidOrig);
+		m_pgidOvrs.push_back(pgidOvr);
 	}
 
 	// set up hash
 	{
-		OvrEntry* e = &m_ovrsLocal.back();
+		// referencing to elem inside vector is unsafe (realloc will change its addr)
+		OvrEntry* e = new OvrEntry;
+		e->pgidOrig = pgidOrig;
+		e->pgidOvr = pgidOvr;
+		e->ver = TAG_TXVER_LOCAL;
 
 		int h = pgidhash(pgidOrig);
 		e->prev = m_hashOvrs[h];
@@ -144,15 +202,15 @@ LocalOvr::checkConflict(LocalOvr* other)
 {
 	if(! other->m_bfOvrs.mayContain(m_bfOvrs)) return false;
 	
-	const int iE = m_ovrsLocal.size();
-	const int jE = other->m_ovrsLocal.size();
+	const int iE = m_pgidOrigs.size();
+	const int jE = other->m_pgidOrigs.size();
 	for(int i = 0; i < iE; ++ i)
 	{
-		page_id_t pgid = m_ovrsLocal[i].pgidOrig;
+		const page_id_t pgid = m_pgidOrigs[i];
 
 		if(! other->m_bfOvrs.mayContain(pgid))
 		{
-			// bloom filter ensures that pgid does not conflict w/ other->m_ovrsLocal...
+			// bloom filter ensures that pgid does not conflict w/ other->m_pgidOrigs...
 
 			// skip
 		}
@@ -160,7 +218,7 @@ LocalOvr::checkConflict(LocalOvr* other)
 		{
 			for(int j = 0; j < jE; ++ j)
 			{
-				page_id_t pgidO = other->m_ovrsLocal[j].pgidOrig;
+				const page_id_t pgidO = other->m_pgidOrigs[j];
 
 				if(pgid == pgidO) return true;
 			}
@@ -168,6 +226,22 @@ LocalOvr::checkConflict(LocalOvr* other)
 	}
 
 	return false;
+}
+
+void
+LocalOvr::dump(std::ostream& s) const
+{
+	s << "** LocalOvr Dump ***" << std::endl;
+	s << "* m_pgidOrigs dump" << std::endl;
+	for(auto it = m_pgidOrigs.begin(); it != m_pgidOrigs.end(); ++ it)
+	{
+		s << *it << std::endl;
+	}
+	s << "* m_pgidOvrs dump" << std::endl;
+	for(auto it = m_pgidOvrs.begin(); it != m_pgidOvrs.end(); ++ it)
+	{
+		s << *it << std::endl;
+	}
 }
 
 bool
@@ -181,7 +255,7 @@ ActiveOvr::tryCommit(LocalOvr* lovr)
 		{
 			LocalOvr* lovrPrev = m_lovrVerifiedTip;
 			lovr->m_prev = lovrPrev;
-			lovr->m_verWrite = lovr->m_prev->m_verWrite + 1;
+			lovr->m_verWrite = (lovrPrev ? lovr->m_prev->m_verWrite : m_verRebase) + 1;
 			__sync_synchronize(); // lovr->m_prev must be set BEFORE tip ptr CAS swing below
 
 			for(LocalOvr* lovrBefore = lovrPrev; lovrBefore && lovrBefore != lovrVerified; lovrBefore = lovrBefore->m_prev)
@@ -261,18 +335,22 @@ ActiveOvr::merge(LocalOvr* lovr)
 	{
 		int roti = i; //(i + off) % TPIO_NHASH;
 
-		// find the head entry of local ovrs and fill e->ver fields
-		OvrEntry* e = lovr->m_hashOvrs[roti];
-		for(; e && e->ver == LocalOvr::TAG_TXVER_LOCAL; e = e->prev)
+		// find the last entry of local ovrs and fill e->ver fields
+		OvrEntry* laste = NULL;
+		for(OvrEntry* e = lovr->m_hashOvrs[roti]; e && e->ver == LocalOvr::TAG_TXVER_LOCAL; e = e->prev)
 		{
+			laste = e;
 			e->ver = lovr->m_verWrite;
 		}
 
 		// append the local ovrs list to the current list
-		e->prev = m_hashOvrs[roti];
-		__sync_synchronize();
+		if(laste)
+		{
+			laste->prev = m_hashOvrs[roti];
+			__sync_synchronize();
 
-		m_hashOvrs[roti] = e->prev;
+			m_hashOvrs[roti] = laste;
+		}
 	}
 
 	__sync_synchronize(); // m_merged must be set after actual merge finishes
@@ -283,11 +361,51 @@ ActiveOvr::merge(LocalOvr* lovr)
 
 } // end of namespace ptnk
 
+#include <gtest/gtest.h>
+
 using namespace ptnk;
 using namespace ptnk::stm;
 
-int
-main(int argc, char* argv[])
+TEST(ptnk, stm_localovr)
 {
-	return 0;
+	ActiveOvr ao;
+	std::unique_ptr<LocalOvr> lo(ao.newTx());
+
+	EXPECT_EQ((page_id_t)3, lo->searchOvr(3));
+
+	lo->addOvr(1, 2);
+	EXPECT_EQ((page_id_t)3, lo->searchOvr(3));
+	EXPECT_EQ((page_id_t)2, lo->searchOvr(2));
+	EXPECT_EQ((page_id_t)2, lo->searchOvr(1));
+
+	lo->addOvr(4, 5);
+	EXPECT_EQ((page_id_t)3, lo->searchOvr(3));
+	EXPECT_EQ((page_id_t)2, lo->searchOvr(2));
+	EXPECT_EQ((page_id_t)2, lo->searchOvr(1));
+	EXPECT_EQ((page_id_t)5, lo->searchOvr(4));
+
+	lo->addOvr(1, 3);
+	EXPECT_EQ((page_id_t)3, lo->searchOvr(1));
+}
+
+TEST(ptnk, stm_basic)
+{
+	ActiveOvr ao;
+
+	{
+		std::unique_ptr<LocalOvr> lo(ao.newTx());
+
+		lo->addOvr(1, 2);
+		lo->addOvr(3, 4);
+
+		EXPECT_TRUE(ao.tryCommit(lo));
+		EXPECT_FALSE(lo.get());
+	}
+
+	{
+		std::unique_ptr<LocalOvr> lo(ao.newTx());
+
+		EXPECT_EQ((page_id_t)2, lo->searchOvr(1));
+		EXPECT_EQ((page_id_t)4, lo->searchOvr(3));
+	}
 }
