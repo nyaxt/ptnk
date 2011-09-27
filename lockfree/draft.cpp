@@ -132,7 +132,15 @@ ActiveOvr::ActiveOvr()
 LocalOvr*
 ActiveOvr::newTx()
 {
-	return new LocalOvr(m_hashOvrs, m_lovrVerifiedTip ? m_lovrVerifiedTip->m_verWrite : m_verRebase);
+	ver_t verRead = m_verRebase;
+	for(LocalOvr* e = m_lovrVerifiedTip; e; e = e->prev)
+	{
+		if(! e->isMerged()) continue;
+
+		verRead = e->m_verWrite;
+		break;
+	}
+	return new LocalOvr(m_hashOvrs, verRead);
 }
 
 LocalOvr::LocalOvr(OvrEntry* hashOvrs[], ver_t verRead)
@@ -150,9 +158,8 @@ page_id_t
 LocalOvr::searchOvr(page_id_t pgid)
 {
 	int h = pgidhash(pgid);
-	OvrEntry* e = m_hashOvrs[h];
 
-	while(e)
+	for(OvrEntry* e = m_hashOvrs[h]; e; e = e->prev)
 	{
 		if(e->ver > m_verRead)
 		{
@@ -164,8 +171,6 @@ LocalOvr::searchOvr(page_id_t pgid)
 		{
 			return e->pgidOvr;
 		}
-
-		e = e->prev;
 	}
 
 	return pgid; // no actie ovr pg found
@@ -255,7 +260,7 @@ ActiveOvr::tryCommit(LocalOvr* lovr)
 		{
 			LocalOvr* lovrPrev = m_lovrVerifiedTip;
 			lovr->m_prev = lovrPrev;
-			lovr->m_verWrite = (lovrPrev ? lovr->m_prev->m_verWrite : m_verRebase) + 1;
+			lovr->m_verWrite = (lovrPrev ? lovrPrev->m_verWrite : m_verRebase) + 1;
 			__sync_synchronize(); // lovr->m_prev must be set BEFORE tip ptr CAS swing below
 
 			for(LocalOvr* lovrBefore = lovrPrev; lovrBefore && lovrBefore != lovrVerified; lovrBefore = lovrBefore->m_prev)
@@ -272,7 +277,7 @@ ActiveOvr::tryCommit(LocalOvr* lovr)
 					return false;
 				}
 			}
-			lovrVerified = lovr->m_prev;
+			lovrVerified = lovrPrev;
 
 			if(__sync_bool_compare_and_swap(&m_lovrVerifiedTip, lovrPrev, lovr))
 			{
@@ -407,5 +412,23 @@ TEST(ptnk, stm_basic)
 
 		EXPECT_EQ((page_id_t)2, lo->searchOvr(1));
 		EXPECT_EQ((page_id_t)4, lo->searchOvr(3));
+		EXPECT_EQ((page_id_t)5, lo->searchOvr(5));
+
+		lo->addOvr(5, 6);
+		lo->addOvr(1, 8);
+
+		EXPECT_EQ((page_id_t)8, lo->searchOvr(1));
+		EXPECT_EQ((page_id_t)4, lo->searchOvr(3));
+		EXPECT_EQ((page_id_t)6, lo->searchOvr(5));
+
+		{
+			std::unique_ptr<LocalOvr> lo2(ao.newTx());
+			
+			EXPECT_EQ((page_id_t)2, lo2->searchOvr(1));
+			EXPECT_EQ((page_id_t)4, lo2->searchOvr(3));
+			EXPECT_EQ((page_id_t)5, lo2->searchOvr(5));
+		}
 	}
+
+
 }
