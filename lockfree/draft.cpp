@@ -29,6 +29,7 @@ std::ostream&
 operator<<(std::ostream& s, const OvrEntry& e)
 {
 	s << "[orig " << e.pgidOrig << " -> ovr " << e.pgidOvr << " | ver: " << e.ver << " prev: " << (void*)e.prev << "]";
+	return s;
 }
 
 inline int pgidhash(page_id_t pgid)
@@ -133,9 +134,9 @@ LocalOvr*
 ActiveOvr::newTx()
 {
 	ver_t verRead = m_verRebase;
-	for(LocalOvr* e = m_lovrVerifiedTip; e; e = e->prev)
+	for(LocalOvr* e = m_lovrVerifiedTip; e; e = e->m_prev)
 	{
-		if(! e->isMerged()) continue;
+		if(! e->m_merged) continue;
 
 		verRead = e->m_verWrite;
 		break;
