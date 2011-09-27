@@ -3941,7 +3941,7 @@ TEST(ptnk, ndbm_api)
 		sprintf(buf, "%u", i);
 
 		ptnk_datum_t key = {(char*)&i, sizeof(int)};
-		ptnk_datum_t value = {buf, ::strlen(buf)+1};
+		ptnk_datum_t value = {buf, static_cast<int>(::strlen(buf)+1)};
 		EXPECT_TRUE(::ptnk_put(db, key, value, PUT_INSERT));
 	}
 

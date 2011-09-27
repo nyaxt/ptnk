@@ -1,6 +1,8 @@
 #ifndef _ptnk_bitvector_h_
 #define _ptnk_bitvector_h_
 
+#include "common.h"
+
 namespace ptnk
 {
 

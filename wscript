@@ -93,6 +93,9 @@ def configure(conf):
 	# make PIC
 	conf.env.append_unique('CXXFLAGS', ['-fPIC'])
 
+	# c++0x
+	conf.env.append_unique('CXXFLAGS', ['-std=c++0x'])
+
 	#########################################################
 	# variants conf. 
 
@@ -157,6 +160,7 @@ def build(bld):
 		ptnk/partitionedpageio.cpp
 		ptnk/btree.cpp
 		ptnk/compmap.cpp
+		ptnk/stm.cpp
 		ptnk/tpio.cpp
 		ptnk/overview.cpp
 		ptnk/db.cpp
@@ -180,6 +184,14 @@ def build(bld):
 	if not bld.env.LIB_GTEST or len(bld.env.LIB_GTEST) == 0:
 		Logs.warn('gtest is not found / skipping ptnk_test')
 	else:
+		bld.program(
+			target = 'stm_test',
+
+			features = 'gtest',
+			use = 'TCMALLOC PTHREAD BOOST_THREAD GTEST ptnk',
+			source = 'stm_test.cpp'
+			)
+
 		bld.program(
 			target = 'ptnk_test',
 

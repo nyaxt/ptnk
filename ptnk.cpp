@@ -237,8 +237,8 @@ try
 {
 	LOG_OUTF("ptnk_put_cstr(db = %p, key = %s, value = %s, mode = %d);\n", db, key, value, mode);
 
-	ptnk_datum_t k = {const_cast<char*>(key), ::strlen(key)};
-	ptnk_datum_t v = {const_cast<char*>(value), ::strlen(value)};
+	ptnk_datum_t k = {const_cast<char*>(key), static_cast<int>(::strlen(key))};
+	ptnk_datum_t v = {const_cast<char*>(value), static_cast<int>(::strlen(value))};
 
 	return ptnk_put(db, k, v, (ptnk::put_mode_t)mode);
 }
@@ -252,7 +252,7 @@ try
 
 	db->impl->get(datum2CRef(key), &db->read_buf);
 
-	ptnk_datum_t ret = {db->read_buf.get(), db->read_buf.valsize()};
+	ptnk_datum_t ret = {db->read_buf.get(), static_cast<int>(db->read_buf.valsize())};
 	return ret;
 }
 COMMON_CATCH_BLOCKS_DATUM(db)
@@ -372,7 +372,7 @@ try
 
 	tx->impl->get(datum2CRef(key), &tx->read_buf);
 
-	ptnk_datum_t ret = {tx->read_buf.get(), tx->read_buf.valsize()};
+	ptnk_datum_t ret = {tx->read_buf.get(), static_cast<int>(tx->read_buf.valsize())};
 	return ret;
 }
 COMMON_CATCH_BLOCKS_DATUM(tx)
@@ -465,7 +465,7 @@ try
 	ptnk::TableOffCache* toc = static_cast<ptnk::TableOffCache*>(table);
 	tx->impl->get(toc, datum2CRef(key), &tx->read_buf);
 
-	ptnk_datum_t ret = {tx->read_buf.get(), tx->read_buf.valsize()};
+	ptnk_datum_t ret = {tx->read_buf.get(), static_cast<int>(tx->read_buf.valsize())};
 	return ret;
 }
 COMMON_CATCH_BLOCKS_DATUM(tx)
