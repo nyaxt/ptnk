@@ -528,7 +528,7 @@ TEST(ptnk, stm_multithread_w_conflict)
 
 	boost::thread_group tg;
 
-	const int NUM_TX = 100000;
+	const int NUM_TX = 1000000;
 	int committed_tx = -2;
 	tg.create_thread([&]() {
 		for(int i = 0; i < NUM_TX; ++ i)
@@ -546,7 +546,13 @@ TEST(ptnk, stm_multithread_w_conflict)
 	});
 
 	tg.create_thread([&]() {
-		for(int i = 0; i < NUM_TX; ++ i)
+		// wait until tx progress
+		while(committed_tx == -2)
+		{
+			asm volatile("" : : : "memory");
+		}
+
+		for(;;)
 		{
 			// bad tx
 			// - begin tx by creating new snapshot
@@ -556,17 +562,26 @@ TEST(ptnk, stm_multithread_w_conflict)
 			__sync_synchronize(); // make sure we read latest committed_tx below
 			int x = committed_tx;
 			if(x == -1) break;
-			while(x == committed_tx)
+			while(x >= committed_tx)
 			{
 				asm volatile("" : : : "memory");
 			}
 
 			// - do a conflicting change
 			int tgt = x+1;
+			bool alreadyCi = t->searchOvr(tgt) != (page_id_t)tgt;
 			t->addOvr(tgt, tgt + 200);
 			
-			// - this tx should fail to commit
-			EXPECT_FALSE(ao.tryCommit(t));
+			if(! alreadyCi)
+			{
+				// - this tx should fail to commit
+				EXPECT_FALSE(ao.tryCommit(t)) << "bad tx success: " << tgt;
+			}
+			else
+			{
+				// - could not create conflicting tx
+				EXPECT_TRUE(ao.tryCommit(t)) << "bad tx fail: " << tgt;
+			}
 		}
 	});
 
