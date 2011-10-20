@@ -5,28 +5,27 @@
 #include <boost/thread.hpp>
 
 using namespace ptnk;
-using namespace ptnk::stm;
 
 TEST(ptnk, stm_localovr)
 {
 	ActiveOvr ao;
 	std::unique_ptr<LocalOvr> lo(ao.newTx());
 
-	EXPECT_EQ((page_id_t)3, lo->searchOvr(3));
+	EXPECT_EQ((page_id_t)3, lo->searchOvr(3).first);
 
 	lo->addOvr(1, 2);
-	EXPECT_EQ((page_id_t)3, lo->searchOvr(3));
-	EXPECT_EQ((page_id_t)2, lo->searchOvr(2));
-	EXPECT_EQ((page_id_t)2, lo->searchOvr(1));
+	EXPECT_EQ((page_id_t)3, lo->searchOvr(3).first);
+	EXPECT_EQ((page_id_t)2, lo->searchOvr(2).first);
+	EXPECT_EQ((page_id_t)2, lo->searchOvr(1).first);
 
 	lo->addOvr(4, 5);
-	EXPECT_EQ((page_id_t)3, lo->searchOvr(3));
-	EXPECT_EQ((page_id_t)2, lo->searchOvr(2));
-	EXPECT_EQ((page_id_t)2, lo->searchOvr(1));
-	EXPECT_EQ((page_id_t)5, lo->searchOvr(4));
+	EXPECT_EQ((page_id_t)3, lo->searchOvr(3).first);
+	EXPECT_EQ((page_id_t)2, lo->searchOvr(2).first);
+	EXPECT_EQ((page_id_t)2, lo->searchOvr(1).first);
+	EXPECT_EQ((page_id_t)5, lo->searchOvr(4).first);
 
 	lo->addOvr(1, 3);
-	EXPECT_EQ((page_id_t)3, lo->searchOvr(1));
+	EXPECT_EQ((page_id_t)3, lo->searchOvr(1).first);
 }
 
 TEST(ptnk, stm_hash_collision)
@@ -38,9 +37,9 @@ TEST(ptnk, stm_hash_collision)
 	lo->addOvr(0 + TPIO_NHASH, 2);
 	lo->addOvr(0 + TPIO_NHASH*2, 3);
 	
-	EXPECT_EQ((page_id_t)1, lo->searchOvr(0));
-	EXPECT_EQ((page_id_t)2, lo->searchOvr(0 + TPIO_NHASH));
-	EXPECT_EQ((page_id_t)3, lo->searchOvr(0 + TPIO_NHASH*2));
+	EXPECT_EQ((page_id_t)1, lo->searchOvr(0).first);
+	EXPECT_EQ((page_id_t)2, lo->searchOvr(0 + TPIO_NHASH).first);
+	EXPECT_EQ((page_id_t)3, lo->searchOvr(0 + TPIO_NHASH*2).first);
 }
 
 TEST(ptnk, stm_basic)
@@ -54,34 +53,34 @@ TEST(ptnk, stm_basic)
 		lo->addOvr(1, 2);
 		lo->addOvr(3, 4);
 
-		EXPECT_TRUE(ao.tryCommit(lo));
+		ao.tryCommit(lo);
 		EXPECT_FALSE(lo.get());
 	}
 
 	{
 		std::unique_ptr<LocalOvr> lo(ao.newTx());
 
-		EXPECT_EQ((page_id_t)2, lo->searchOvr(1));
-		EXPECT_EQ((page_id_t)4, lo->searchOvr(3));
-		EXPECT_EQ((page_id_t)5, lo->searchOvr(5));
+		EXPECT_EQ(make_pair((page_id_t)2, OVR_GLOBAL), lo->searchOvr(1));
+		EXPECT_EQ(make_pair((page_id_t)4, OVR_GLOBAL), lo->searchOvr(3));
+		EXPECT_EQ(make_pair((page_id_t)5, OVR_NONE),   lo->searchOvr(5));
 
 		lo->addOvr(5, 6);
 		lo->addOvr(1, 8);
 
-		EXPECT_EQ((page_id_t)8, lo->searchOvr(1));
-		EXPECT_EQ((page_id_t)4, lo->searchOvr(3));
-		EXPECT_EQ((page_id_t)6, lo->searchOvr(5));
+		EXPECT_EQ(make_pair((page_id_t)8, OVR_LOCAL),  lo->searchOvr(1));
+		EXPECT_EQ(make_pair((page_id_t)4, OVR_GLOBAL), lo->searchOvr(3));
+		EXPECT_EQ(make_pair((page_id_t)6, OVR_LOCAL),  lo->searchOvr(5));
 
 		{
 			std::unique_ptr<LocalOvr> lo2(ao.newTx());
 			
-			// un-committed transactions have no effect
-			EXPECT_EQ((page_id_t)2, lo2->searchOvr(1));
-			EXPECT_EQ((page_id_t)4, lo2->searchOvr(3));
-			EXPECT_EQ((page_id_t)5, lo2->searchOvr(5));
+			// uncommitted transactions have no effect
+			EXPECT_EQ(make_pair((page_id_t)2, OVR_GLOBAL), lo2->searchOvr(1));
+			EXPECT_EQ(make_pair((page_id_t)4, OVR_GLOBAL), lo2->searchOvr(3));
+			EXPECT_EQ(make_pair((page_id_t)5, OVR_NONE),   lo2->searchOvr(5));
 		}
 
-		EXPECT_TRUE(ao.tryCommit(lo));
+		ao.tryCommit(lo);
 		EXPECT_FALSE(lo.get());
 	}
 
@@ -91,14 +90,14 @@ TEST(ptnk, stm_basic)
 		std::unique_ptr<LocalOvr> b(ao.newTx());
 
 		a->addOvr(10, 11);
-		EXPECT_EQ((page_id_t)11, a->searchOvr(10));
-		EXPECT_EQ((page_id_t)10, b->searchOvr(10));
+		EXPECT_EQ(make_pair((page_id_t)11, OVR_LOCAL), a->searchOvr(10));
+		EXPECT_EQ(make_pair((page_id_t)10, OVR_NONE),  b->searchOvr(10));
 
 		b->addOvr(10, 12);
 		
-		EXPECT_TRUE(ao.tryCommit(a));
+		ao.tryCommit(a);
 		EXPECT_FALSE(a.get());
-		EXPECT_FALSE(ao.tryCommit(b));
+		ao.tryCommit(b);
 		EXPECT_TRUE(b.get());
 	}
 }
@@ -119,7 +118,8 @@ TEST(ptnk, stm_multithread)
 				std::unique_ptr<LocalOvr> t(ao.newTx());
 				t->addOvr(i+NUM_TX*ith, i);
 				
-				EXPECT_TRUE(ao.tryCommit(t));
+				ao.tryCommit(t);
+				EXPECT_FALSE(t.get());
 			}
 		});
 	}
@@ -135,7 +135,7 @@ TEST(ptnk, stm_multithread)
 		{
 			for(int i = 0; i < NUM_TX; ++ i)
 			{
-				EXPECT_EQ((page_id_t)(i), t->searchOvr(i+NUM_TX*ith));
+				EXPECT_EQ((page_id_t)(i), t->searchOvr(i+NUM_TX*ith).first);
 			}
 		}
 	}
@@ -155,8 +155,9 @@ TEST(ptnk, stm_multithread_w_conflict)
 			// good tx	
 			std::unique_ptr<LocalOvr> t(ao.newTx());
 			t->addOvr(i, i + 100);
-			
-			EXPECT_TRUE(ao.tryCommit(t));
+
+			ao.tryCommit(t);
+			EXPECT_FALSE(t.get());
 
 			committed_tx = i;
 			__sync_synchronize(); // force write committed_tx
@@ -188,18 +189,19 @@ TEST(ptnk, stm_multithread_w_conflict)
 
 			// - do a conflicting change
 			int tgt = x+1;
-			bool alreadyCi = t->searchOvr(tgt) != (page_id_t)tgt;
+			bool alreadyCi = t->searchOvr(tgt).second != OVR_NONE;
 			t->addOvr(tgt, tgt + 200);
-			
+
+			ao.tryCommit(t);
 			if(! alreadyCi)
 			{
 				// - this tx should fail to commit
-				EXPECT_FALSE(ao.tryCommit(t)) << "bad tx success: " << tgt;
+				EXPECT_TRUE(t.get()) << "bad tx success: " << tgt;
 			}
 			else
 			{
 				// - could not create conflicting tx
-				EXPECT_TRUE(ao.tryCommit(t)) << "bad tx fail: " << tgt;
+				EXPECT_FALSE(t.get()) << "bad tx fail: " << tgt;
 			}
 		}
 	});

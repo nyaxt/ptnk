@@ -49,13 +49,18 @@ int ptnk_memcmp(const void* a, const void* b, size_t s);
 #include <utility>
 #include <algorithm>
 #include <vector>
+#include <memory>
 #include <boost/scoped_ptr.hpp>
+#include <tuple>
 
 namespace ptnk
 {
 
 using std::pair;
 using std::make_pair;
+
+using std::unique_ptr;
+using std::tie;
 
 // === misc template utils ===
 

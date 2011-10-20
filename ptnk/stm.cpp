@@ -3,9 +3,6 @@
 namespace ptnk
 {
 
-namespace stm
-{
-
 std::ostream&
 operator<<(std::ostream& s, const OvrEntry& e)
 {
@@ -24,7 +21,7 @@ LocalOvr::LocalOvr(OvrEntry* hashOvrs[], ver_t verRead)
 	}
 }
 
-page_id_t
+pair<page_id_t, ovr_status_t>
 LocalOvr::searchOvr(page_id_t pgid)
 {
 	int h = pgidhash(pgid);
@@ -39,11 +36,12 @@ LocalOvr::searchOvr(page_id_t pgid)
 
 		if(e->pgidOrig == pgid)
 		{
-			return e->pgidOvr;
+			ovr_status_t st = (e->ver == TAG_TXVER_LOCAL) ? OVR_LOCAL : OVR_GLOBAL;
+			return make_pair(e->pgidOvr, st);
 		}
 	}
 
-	return pgid; // no actie ovr pg found
+	return make_pair(pgid, OVR_NONE); // no actie ovr pg found
 }
 
 void
@@ -131,7 +129,7 @@ ActiveOvr::ActiveOvr()
 	}
 }
 
-LocalOvr*
+unique_ptr<LocalOvr>
 ActiveOvr::newTx()
 {
 	ver_t verRead = m_verRebase;
@@ -142,12 +140,14 @@ ActiveOvr::newTx()
 		verRead = e->m_verWrite;
 		break;
 	}
-	return new LocalOvr(m_hashOvrs, verRead);
+	return unique_ptr<LocalOvr>(new LocalOvr(m_hashOvrs, verRead));
 }
 
 bool
-ActiveOvr::tryCommit(LocalOvr* lovr)
+ActiveOvr::tryCommit(unique_ptr<LocalOvr>& plovr)
 {
+	LocalOvr* lovr = plovr.get();
+
 	// step 1: validate _lovr_ that it does not conflict with other txs and add _lovr_ to validated ovrs list
 	{
 		LocalOvr* lovrVerified = NULL;
@@ -214,6 +214,7 @@ ActiveOvr::tryCommit(LocalOvr* lovr)
 		}
 	}
 
+	plovr.release();
 	return true;
 }
 
@@ -269,7 +270,5 @@ ActiveOvr::dump(std::ostream& s) const
 	s << "last verified tip: " << std::endl;
 	s << *m_lovrVerifiedTip << std::endl;
 }
-
-} // end of namespace stm
 
 } // end of namespace ptnk

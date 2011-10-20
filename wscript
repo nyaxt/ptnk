@@ -162,6 +162,7 @@ def build(bld):
 		ptnk/compmap.cpp
 		ptnk/stm.cpp
 		ptnk/tpio.cpp
+		ptnk/tpio2.cpp
 		ptnk/overview.cpp
 		ptnk/db.cpp
 		ptnk.cpp

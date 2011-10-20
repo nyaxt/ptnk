@@ -3,8 +3,6 @@
 #include "hash.h"
 #include "streak.h"
 
-#include <boost/tuple/tuple.hpp> // boost::tie
-
 namespace ptnk
 {
 
@@ -640,7 +638,7 @@ TPIOTxSession::readPage(page_id_t pgid)
 #else
 	bool isOvr = false;
 	bool wasCached = false; page_id_t pgidOvr = pgid;
-	boost::tie(wasCached, pgidOvr) = m_cache.lookup(pgid);
+	tie(wasCached, pgidOvr) = m_cache.lookup(pgid);
 	if(wasCached)
 	{
 		isOvr = (pgidOvr != pgid);
@@ -701,7 +699,7 @@ TPIOTxSession::modifyPage(const Page& page, mod_info_t* mod)
 		mod->idOrig = page.pageOrigId();
 
 		Page ovr;
-		boost::tie(ovr, mod->idOvr) = newPage();
+		tie(ovr, mod->idOvr) = newPage();
 		-- m_numUniquePagesLocal;
 
 		ovr.makePageOvr(page, mod->idOvr);

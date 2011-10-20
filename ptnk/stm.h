@@ -1,8 +1,6 @@
 #ifndef _ptnk_stm_h_
 #define _ptnk_stm_h_
 
-#include <memory>
-
 #include "bitvector.h"
 #include "page.h"
 
@@ -10,9 +8,6 @@ namespace ptnk
 {
 
 typedef tx_id_t ver_t;
-
-namespace stm
-{
 
 enum { TPIO_NHASH = 64 };
 
@@ -27,6 +22,13 @@ struct OvrEntry
 	OvrEntry* prev;
 };
 std::ostream& operator<<(std::ostream& s, const OvrEntry& e);
+
+enum ovr_status_t 
+{
+	OVR_NONE, //!< the page got no ovrs
+	OVR_GLOBAL, //!< there is global override for the page
+	OVR_LOCAL, //!< there is local override for the page
+};
 
 inline int pgidhash(page_id_t pgid)
 {
@@ -54,7 +56,7 @@ class __attribute__ ((aligned (8))) LocalOvr
 public:
 	LocalOvr(OvrEntry* hashOvrs[], ver_t verRead);
 
-	page_id_t searchOvr(page_id_t pgid);
+	pair<page_id_t, ovr_status_t> searchOvr(page_id_t pgid);
 	void addOvr(page_id_t pgidOrig, page_id_t pgidOvr);
 
 	void dump(std::ostream& s) const;
@@ -91,14 +93,8 @@ class ActiveOvr
 public:
 	ActiveOvr();
 
-	LocalOvr* newTx();
-	bool tryCommit(LocalOvr* lovr);
-	bool tryCommit(std::unique_ptr<LocalOvr>& lovr)
-	{
-		bool ret = tryCommit(lovr.get());
-		if(ret) lovr.release();
-		return ret;
-	}
+	unique_ptr<LocalOvr> newTx();
+	bool tryCommit(unique_ptr<LocalOvr>& lovr);
 
 	void dump(std::ostream& s) const;
 
@@ -119,8 +115,6 @@ private:
 inline
 std::ostream& operator<<(std::ostream& s, const ActiveOvr& o)
 { o.dump(s); return s; }
-
-} // end of namespace stm
 
 } // end of namespace ptnk
 
