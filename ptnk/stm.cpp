@@ -21,6 +21,26 @@ LocalOvr::LocalOvr(OvrEntry* hashOvrs[], ver_t verRead)
 	}
 }
 
+LocalOvr::~LocalOvr()
+{
+	if(! m_merged)
+	{
+		// OvrEntry ownership not transferred to ActiveOvr...
+
+		// need to delete "OvrEntry"s this has created
+
+		for(int i = 0; i < TPIO_NHASH; ++ i)
+		{
+			for(OvrEntry* e = m_hashOvrs[i]; e && e->ver == LocalOvr::TAG_TXVER_LOCAL;)
+			{
+				OvrEntry* prev = e->prev;
+				delete e;
+				e = prev;
+			}
+		}
+	}
+}
+
 pair<page_id_t, ovr_status_t>
 LocalOvr::searchOvr(page_id_t pgid)
 {
@@ -129,6 +149,29 @@ ActiveOvr::ActiveOvr()
 	}
 }
 
+ActiveOvr::~ActiveOvr()
+{
+	for(LocalOvr* lovr = m_lovrVerifiedTip; lovr;)
+	{
+		LocalOvr* prev = lovr->m_prev;
+		if(lovr->m_merged)
+		{
+			delete lovr;
+		}
+		lovr = prev;
+	}
+
+	for(int i = 0; i < TPIO_NHASH; ++ i)
+	{
+		for(OvrEntry* e = m_hashOvrs[i]; e;)
+		{
+			OvrEntry* prev = e->prev;
+			delete e;
+			e = prev;
+		}
+	}
+}
+
 unique_ptr<LocalOvr>
 ActiveOvr::newTx()
 {
@@ -144,7 +187,7 @@ ActiveOvr::newTx()
 }
 
 bool
-ActiveOvr::tryCommit(unique_ptr<LocalOvr>& plovr)
+ActiveOvr::tryCommit(LocalOvr* lovr)
 {
 	LocalOvr* lovr = plovr.get();
 

@@ -55,6 +55,7 @@ class __attribute__ ((aligned (8))) LocalOvr
 {
 public:
 	LocalOvr(OvrEntry* hashOvrs[], ver_t verRead);
+	~LocalOvr();
 
 	pair<page_id_t, ovr_status_t> searchOvr(page_id_t pgid);
 	void addOvr(page_id_t pgidOrig, page_id_t pgidOvr);
@@ -92,6 +93,7 @@ class ActiveOvr
 {
 public:
 	ActiveOvr();
+	~ActiveOvr();
 
 	unique_ptr<LocalOvr> newTx();
 	bool tryCommit(unique_ptr<LocalOvr>& lovr);
