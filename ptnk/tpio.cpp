@@ -622,7 +622,6 @@ TPIOTxSession::newPage()
 	++ m_numUniquePagesLocal;
 
 	pair<Page, page_id_t> ret = m_backend->newPage();
-	ret.first.setCacheStatus(ST_TX_LOCAL);
 
 	return ret;
 }
@@ -676,12 +675,7 @@ TPIOTxSession::readPage(page_id_t pgid)
 	if(m_pagesModified.find(pgidOvr) != m_pagesModified.end())
 	{
 		// local mod
-		pg.setCacheStatus(ST_TX_LOCAL);	
-	}
-	else
-	{
-		// not local mod
-		pg.setCacheStatus(ST_PUBLISHED);
+		pg.setMutable();	
 	}
 
 	return pg;
@@ -692,7 +686,7 @@ TPIOTxSession::modifyPage(const Page& page, mod_info_t* mod)
 {
 	++ m_stat.nModifyPage;
 
-	if(page.cacheStatus() > ST_TX_LOCAL)
+	if(! page.isMutable())
 	{
 		++ m_stat.nNewOvr;
 
@@ -703,7 +697,6 @@ TPIOTxSession::modifyPage(const Page& page, mod_info_t* mod)
 		-- m_numUniquePagesLocal;
 
 		ovr.makePageOvr(page, mod->idOvr);
-		ovr.setCacheStatus(ST_TX_LOCAL);
 
 		m_ovrsTxLocal.add(mod->idOrig, mod->idOvr);
 		m_cache.add(mod->idOrig, mod->idOvr); // invalidate cache

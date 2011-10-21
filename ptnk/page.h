@@ -104,21 +104,6 @@ struct page_hdr_t
 	flags_t flags;
 } __attribute__((__packed__));
 
-enum cache_status_t
-{
-	//! no page cache management
-	ST_NOMGMT,
-
-	//! the page is tx locally modified
-	ST_TX_LOCAL,
-
-	//! the page on memory is modified and diff-logged, but it is not yet committed to disk
-	ST_LOCAL,
-
-	//! the page is already committed to disk
-	ST_PUBLISHED,
-};
-
 class PageIO;
 
 #ifndef PTNK_STREAK_SIZE
@@ -255,11 +240,6 @@ public:
 		}
 	}
 
-	cache_status_t cacheStatus() const
-	{
-		return (cache_status_t)(m_impl & 0x3);
-	}
-
 	bool isMutable() const
 	{
 		return m_impl & 0x4;
@@ -279,11 +259,6 @@ public:
 	{
 		if(b) m_impl |= 0x8;
 		else m_impl &= ~(uintptr_t)0x8;
-	}
-
-	void setCacheStatus(cache_status_t st)
-	{
-		m_impl = (m_impl & ~(uintptr_t)0x3) | st;
 	}
 
 	void dumpHeader() const;

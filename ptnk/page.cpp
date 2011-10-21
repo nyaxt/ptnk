@@ -12,7 +12,7 @@ Page::dyndispatcher_t* Page::ms_dyndispatch[PT_MAX+1];
 void
 Page::dumpHeader() const
 {
-	std::cout << "Page [id:" << pgid2str(hdr()->id) << " -> ovr:" << pgid2str(hdr()->idOvrTgt) << "] type: " << (uint16_t)(hdr()->type) << " txid: " << hdr()->txid << " flags: " << (uint16_t)hdr()->flags << " cachest: " << cacheStatus() << std::endl;
+	std::cout << "Page [id:" << pgid2str(hdr()->id) << " -> ovr:" << pgid2str(hdr()->idOvrTgt) << "] type: " << (uint16_t)(hdr()->type) << " txid: " << hdr()->txid << " flags: " << (uint16_t)hdr()->flags << std::endl;
 }
 
 void
