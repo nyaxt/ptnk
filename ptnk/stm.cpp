@@ -187,7 +187,7 @@ ActiveOvr::newTx()
 }
 
 bool
-ActiveOvr::tryCommit(LocalOvr* lovr)
+ActiveOvr::tryCommit(unique_ptr<LocalOvr>& plovr)
 {
 	LocalOvr* lovr = plovr.get();
 

@@ -3,6 +3,7 @@
 
 #include "pageio.h"
 #include "stm.h"
+#include "pol.h"
 
 // Transactional PageIO impl. using stm.h
 
@@ -70,7 +71,16 @@ protected:
 	PageIO* getBackend() const;
 
 	unique_ptr<LocalOvr> m_lovr;
-	PagesOldLink* m_oldlink;
+	struct OvrExtra : public LocalOvr::ExtraData
+	{
+		~OvrExtra();
+
+		PagesOldLink oldlink;
+	};
+	PagesOldLink* getOldLink()
+	{
+		return &reinterpret_cast<OvrExtra*>(m_lovr->getExtra())->oldlink;
+	};
 
 	TPIOStat m_stat;
 

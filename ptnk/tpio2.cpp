@@ -9,8 +9,12 @@ TPIO2TxSession::TPIO2TxSession(TPIO2* tpio, unique_ptr<LocalOvr>&& lovr)
 :	m_tpio(tpio),
 	m_lovr(move(lovr))
 {
-	m_oldlink = new PagesOldLink;
-	m_lovr->attachData();
+	m_lovr->attachExtra(unique_ptr<OvrExtra>(new OvrExtra));
+}
+
+TPIO2TxSession::OvrExtra::~OvrExtra()
+{
+	/* NOP */
 }
 
 TPIO2TxSession::~TPIO2TxSession()
@@ -123,7 +127,7 @@ TPIO2TxSession::notifyPageWOldLink(page_id_t pgid)
 {
 	++ m_stat.nNotifyOldLink;
 
-	m_oldlink->add(pgid);
+	getOldLink()->add(pgid);
 }
 
 TPIO2::TPIO2(boost::shared_ptr<PageIO> backend)
@@ -146,7 +150,7 @@ TPIO2::newTransaction()
 bool
 TPIO2::tryCommit(TPIO2TxSession* tx)
 {
-	if(m_pagesModified.empty())
+	if(tx->m_pagesModified.empty())
 	{
 		// no write in tx
 		return true;
@@ -161,13 +165,14 @@ TPIO2::tryCommit(TPIO2TxSession* tx)
 	// ovr info committed!...
 	// now do the page writes
 	
-	std::sort(m_pagesModified.begin(), m_pagesModified.end());
+	std::sort(tx->m_pagesModified.begin(), tx->m_pagesModified.end());
 	// TODO:
 	// fill tpio header
 	// write streaks
 	// sync!
 	// etc. etc.
+	
+	return true;
 }
-
 
 } // end of namespace ptnk

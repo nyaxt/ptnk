@@ -6,10 +6,44 @@
 
 /* these types are global when compiled with C */
 #ifdef __cplusplus
+/* >>>>> begin C++ only types */
+#include <set>
+#include <vector>
 namespace ptnk {
 
+//                          0123456789abcdef
+#define PGID_LOCALID_MASK 0x000FFFFFFFFFFFFFULL
+#define PGID_LOCALID(pgid) ((pgid) & PGID_LOCALID_MASK)
+#define PGID_PARTID(pgid) ((pgid) >> 52)
+#define PGID_PARTSTART(partid) (((page_id_t)(partid)) << 52)
+#define PGID_PARTLOCAL(partid, localid) (PGID_PARTSTART(partid) | (localid & PGID_LOCALID_MASK))
 typedef uint64_t page_id_t;
+typedef std::set<page_id_t> Spage_id_t;
+typedef std::vector<page_id_t> Vpage_id_t;
 
+#define PGID_INVALID (page_id_t)(~0)
+
+//! partition local page id type
+typedef uint64_t local_pgid_t;
+#define PTNK_LOCALID_INVALID ((local_pgid_t)~0ULL)
+
+//! partition id type
+typedef uint16_t part_id_t;
+//    the max valid partid is 4094 = 0xFFE to avoid being PGID_INVALID
+#define PTNK_PARTID_MAX 4094
+#define PTNK_PARTID_INVALID ((part_id_t)~0)
+
+//! transaction ID number
+/*!
+ *	transaction unique identifier.
+ *	Note: The ID is in order of transaction commit. 
+ */
+typedef uint64_t tx_id_t;
+#define TXID_INVALID (tx_id_t)(~0)
+
+typedef std::set<tx_id_t> Stx_id_t;
+
+/* <<<<< end begin C++ only types */
 #endif
 #undef P_
 #ifdef PTNK_ADD_PREFIX

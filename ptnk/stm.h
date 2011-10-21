@@ -1,8 +1,10 @@
 #ifndef _ptnk_stm_h_
 #define _ptnk_stm_h_
 
+#include <iostream>
+
 #include "bitvector.h"
-#include "page.h"
+#include "types.h"
 
 namespace ptnk
 {
@@ -62,6 +64,14 @@ public:
 
 	void dump(std::ostream& s) const;
 
+	class ExtraData
+	{
+	public:
+		virtual ~ExtraData() = 0;	
+	};
+	void attachExtra(unique_ptr<ExtraData>&& extra);
+	ExtraData* getExtra() { return m_extra.get(); }
+
 private:
 	enum { TAG_TXVER_LOCAL = 0 };
 
@@ -83,6 +93,8 @@ private:
 	LocalOvr* m_prev;
 	bool m_mergeOngoing;
 	bool m_merged;
+
+	unique_ptr<ExtraData> m_extra;
 };
 
 inline

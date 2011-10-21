@@ -5,44 +5,12 @@
 #include "exceptions.h"
 #include "types.h"
 
-#include <set>
-#include <vector>
 #include <string>
 
 namespace ptnk
 {
 
-//                          0123456789abcdef
-#define PGID_LOCALID_MASK 0x000FFFFFFFFFFFFFULL
-#define PGID_LOCALID(pgid) ((pgid) & PGID_LOCALID_MASK)
-#define PGID_PARTID(pgid) ((pgid) >> 52)
-#define PGID_PARTSTART(partid) (((page_id_t)(partid)) << 52)
-#define PGID_PARTLOCAL(partid, localid) (PGID_PARTSTART(partid) | (localid & PGID_LOCALID_MASK))
 std::string pgid2str(page_id_t pgid);
-
-static const page_id_t PGID_INVALID = (page_id_t)(~0);
-typedef std::set<page_id_t> Spage_id_t;
-typedef std::vector<page_id_t> Vpage_id_t;
-
-//! partition local page id type
-typedef uint64_t local_pgid_t;
-#define PTNK_LOCALID_INVALID ((local_pgid_t)~0ULL)
-
-//! partition id type
-typedef uint16_t part_id_t;
-//    the max valid partid is 4094 = 0xFFE to avoid being PGID_INVALID
-#define PTNK_PARTID_MAX 4094
-#define PTNK_PARTID_INVALID ((part_id_t)~0)
-
-//! transaction ID number
-/*!
- *	transaction unique identifier.
- *	Note: The ID is in order of transaction commit. 
- */
-typedef uint64_t tx_id_t;
-static const tx_id_t TXID_INVALID = (tx_id_t)(~0);
-
-typedef std::set<tx_id_t> Stx_id_t;
 
 enum page_type_t_
 {
