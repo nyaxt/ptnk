@@ -375,7 +375,7 @@ OverviewPage::refreshAllLeafPages_(void** cursor, page_id_t threshold, int numPa
 
 	if(pio->readPage(getDefaultTableRoot()).refreshAllLeafPages(&ralpc->cursorTable, threshold, numPages, pageOrigId(), pio))
 	{
-		pio->notifyPageWOldLink(pageOrigId(), PGID_INVALID);	
+		pio->notifyPageWOldLink(pageOrigId());	
 	}
 
 	if(! ralpc->cursorTable)

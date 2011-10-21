@@ -741,7 +741,7 @@ TPIOTxSession::getLastPgId() const
 }
 
 void
-TPIOTxSession::notifyPageWOldLink(page_id_t pgid, page_id_t pgidDep)
+TPIOTxSession::notifyPageWOldLink(page_id_t pgid)
 {
 	++ m_stat.nNotifyOldLink;
 
@@ -749,7 +749,7 @@ TPIOTxSession::notifyPageWOldLink(page_id_t pgid, page_id_t pgidDep)
 }
 
 page_id_t
-TPIOTxSession::updateLink(page_id_t idOld)
+TPIOTxSession::updateLink(page_id_t pgidOld)
 {
 	PTNK_THROW_LOGIC_ERR("updateLink called in normal(non-rebase) tx");
 }

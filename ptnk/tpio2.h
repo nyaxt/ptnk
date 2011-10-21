@@ -59,19 +59,22 @@ public:
 
 	page_id_t getLastPgId() const;
 
-	void notifyPageWOldLink(page_id_t id, page_id_t idDep = PGID_INVALID);
-	page_id_t updateLink(page_id_t idOld);
+	void notifyPageWOldLink(page_id_t pgid);
+	page_id_t updateLink(page_id_t pgidOld);
 
 protected:
 	friend class TPIO2; // give access to c-tor
 	TPIO2TxSession(TPIO2* tpio, unique_ptr<LocalOvr>&& lovr);
 
 	TPIO2* m_tpio;
-	PageIO* getBackend();
+	PageIO* getBackend() const;
 
 	unique_ptr<LocalOvr> m_lovr;
+	PagesOldLink* m_oldlink;
 
 	TPIOStat m_stat;
+
+	Vpage_id_t m_pagesModified;
 };
 
 class TPIO2
@@ -104,7 +107,7 @@ TPIO2TxSession::tryCommit()
 
 inline
 PageIO*
-TPIO2TxSession::getBackend()
+TPIO2TxSession::getBackend() const
 {
 	return m_tpio->getBackend();
 }

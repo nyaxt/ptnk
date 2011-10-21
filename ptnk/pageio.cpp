@@ -100,7 +100,7 @@ PageIO::dumpStat() const
 }
 
 void
-PageIO::notifyPageWOldLink(page_id_t id, page_id_t idDep)
+PageIO::notifyPageWOldLink(page_id_t id)
 {
 	/* NOP */
 }

@@ -9,7 +9,8 @@ TPIO2TxSession::TPIO2TxSession(TPIO2* tpio, unique_ptr<LocalOvr>&& lovr)
 :	m_tpio(tpio),
 	m_lovr(move(lovr))
 {
-	/* NOP */
+	m_oldlink = new PagesOldLink;
+	m_lovr->attachData();
 }
 
 TPIO2TxSession::~TPIO2TxSession()
@@ -60,6 +61,71 @@ TPIO2TxSession::readPage(page_id_t pgid)
 	return pg;
 }
 
+Page
+TPIO2TxSession::modifyPage(const Page& page, mod_info_t* mod)
+{
+	++ m_stat.nModifyPage;
+
+	if(! page.isMutable())
+	{
+		++ m_stat.nNewOvr;
+
+		mod->idOrig = page.pageOrigId();
+
+		Page ovr;
+		tie(ovr, mod->idOvr) = newPage();
+		-- m_stat.numUniquePages;
+
+		ovr.makePageOvr(page, mod->idOvr);
+
+		m_lovr->addOvr(mod->idOrig, mod->idOvr);
+		
+		return ovr;
+	}
+	else
+	{
+		mod->reset();
+
+		return page;
+	}
+}
+
+void
+TPIO2TxSession::discardPage(page_id_t pgid, mod_info_t* mod)
+{
+	if(mod)
+	{
+		mod->idOrig = pgid;
+		mod->idOvr = PGID_INVALID;
+	}
+
+	m_lovr->addOvr(pgid, PGID_INVALID); // FIXME: is this really needed?
+}
+
+void
+TPIO2TxSession::sync(page_id_t pgid)
+{
+	++ m_stat.nSync;
+	
+	m_pagesModified.push_back(pgid);
+	// sync to backend is delayed to after commit
+	// m_backend->sync(pgid);
+}
+
+page_id_t
+TPIO2TxSession::getLastPgId() const
+{
+	return getBackend()->getLastPgId();
+}
+
+void
+TPIO2TxSession::notifyPageWOldLink(page_id_t pgid)
+{
+	++ m_stat.nNotifyOldLink;
+
+	m_oldlink->add(pgid);
+}
+
 TPIO2::TPIO2(boost::shared_ptr<PageIO> backend)
 :	m_backend(backend)
 {
@@ -80,14 +146,27 @@ TPIO2::newTransaction()
 bool
 TPIO2::tryCommit(TPIO2TxSession* tx)
 {
-	if(m_aovr->tryCommit(tx->m_lovr))
+	if(m_pagesModified.empty())
 	{
-		return true;	
+		// no write in tx
+		return true;
 	}
-	else
+
+	// try committing ovr info
+	if(! m_aovr->tryCommit(tx->m_lovr))
 	{
 		return false;	
 	}
+
+	// ovr info committed!...
+	// now do the page writes
+	
+	std::sort(m_pagesModified.begin(), m_pagesModified.end());
+	// TODO:
+	// fill tpio header
+	// write streaks
+	// sync!
+	// etc. etc.
 }
 
 

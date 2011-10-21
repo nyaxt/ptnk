@@ -2,9 +2,9 @@
 #define _ptnk_tpio_h_
 
 #include "pageio.h"
+#include "pol.h"
 
 #include <boost/shared_ptr.hpp>
-#include <boost/foreach.hpp>
 #include <boost/array.hpp>
 #include <boost/thread.hpp>
 
@@ -110,72 +110,6 @@ private:
 	tx_id_t m_verDamaged;
 };
 
-class PagesOldLink
-{
-public:
-	PagesOldLink();
-	~PagesOldLink();
-
-	void add(page_id_t pgid)
-	{
-		m_impl.insert(pgid);
-	}
-
-	void merge(const PagesOldLink& o);
-
-	bool contains(page_id_t pgid) const
-	{
-		return m_impl.find(pgid) != m_impl.end();	
-	}
-
-	void clear()
-	{
-		m_impl.clear();	
-	}
-
-	size_t size()
-	{
-		return m_impl.size();	
-	}
-
-	template<typename T>
-	void dump(T& tgt)
-	{
-		size_t count = m_impl.size();
-		tgt.write(BufferCRef(&count, sizeof(size_t)));
-
-		BOOST_FOREACH(page_id_t pgid, m_impl)
-		{
-			BufferCRef buf(&pgid, sizeof(page_id_t));
-			tgt.write(buf);
-		}
-	}
-
-	template<typename T>
-	void restore(T& tgt)
-	{
-		size_t count;
-		tgt.popFrontTo(&count, sizeof(size_t));
-
-		for(size_t i = 0; i < count; ++ i)
-		{
-			page_id_t pgid;
-			tgt.popFrontTo(&pgid, sizeof(page_id_t));
-			
-			add(pgid);
-		}
-	}
-
-	char* niseDumpState(char* buf);
-	const char* niseRestoreState(const char* buf);
-
-private:
-	//! pages with links to already overrode pages
-	Spage_id_t m_impl;
-
-	friend class TPIO;
-};
-
 class OverridesCache
 {
 public:
@@ -243,8 +177,8 @@ public:
 
 	page_id_t getLastPgId() const;
 
-	void notifyPageWOldLink(page_id_t id, page_id_t idDep = PGID_INVALID);
-	page_id_t updateLink(page_id_t idOld);
+	void notifyPageWOldLink(page_id_t pgid);
+	page_id_t updateLink(page_id_t pgidOld);
 
 	// ====== start page accessor ======
 

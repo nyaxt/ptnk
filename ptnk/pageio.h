@@ -105,7 +105,7 @@ public:
 	//! get last valid localid of the partition _ptid_
 	virtual local_pgid_t getPartLastLocalPgId(part_id_t ptid) const;
 
-	virtual void notifyPageWOldLink(page_id_t pgid, page_id_t pgidDep = PGID_INVALID);
+	virtual void notifyPageWOldLink(page_id_t pgid);
 	virtual page_id_t updateLink(page_id_t pgidOld);
 
 	//! check if an initial setup is needed
