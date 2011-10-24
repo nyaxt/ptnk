@@ -12,7 +12,7 @@ namespace ptnk
 
 struct TPIOStat
 {
-	unsigned int numUniquePages;
+	unsigned int nUniquePages;
 
 	unsigned int nRead;
 	unsigned int nReadOvr;
@@ -25,8 +25,6 @@ struct TPIOStat
 
 	unsigned int nNotifyOldLink;
 
-	unsigned int nCommitFail;
-
 	TPIOStat() :
 		nRead(0),
 		nReadOvr(0),
@@ -34,10 +32,8 @@ struct TPIOStat
 		nModifyPage(0),
 		nNewOvr(0),
 		nSync(0),
-		nNotifyOldLink(0),
-		nCommitFail(0)
+		nNotifyOldLink(0)
 	{ /* NOP */ }
-	void dump() const;
 };
 
 class TPIO2;
@@ -46,6 +42,8 @@ class TPIO2TxSession : public PageIO
 {
 public:
 	~TPIO2TxSession();
+
+	void dump(std::ostream& s) const;
 
 	bool tryCommit();
 
@@ -63,12 +61,24 @@ public:
 	void notifyPageWOldLink(page_id_t pgid);
 	page_id_t updateLink(page_id_t pgidOld);
 
+	// ====== start page accessor ======
+
+	page_id_t pgidStartPage()
+	{
+		return m_lovr->pgidStartPage();	
+	}
+
+	void setPgidStartPage(page_id_t pgid)
+	{
+		m_lovr->setPgidStartPage(pgid);
+	}
+
 protected:
 	friend class TPIO2; // give access to c-tor
 	TPIO2TxSession(TPIO2* tpio, unique_ptr<LocalOvr>&& lovr);
 
 	TPIO2* m_tpio;
-	PageIO* getBackend() const;
+	PageIO* backend() const;
 
 	unique_ptr<LocalOvr> m_lovr;
 	struct OvrExtra : public LocalOvr::ExtraData
@@ -82,10 +92,13 @@ protected:
 		return &reinterpret_cast<OvrExtra*>(m_lovr->getExtra())->oldlink;
 	};
 
-	TPIOStat m_stat;
-
 	Vpage_id_t m_pagesModified;
+
+	TPIOStat m_stat;
 };
+inline
+std::ostream& operator<<(std::ostream& s, const TPIO2TxSession& o)
+{ o.dump(s); return s; }
 
 class TPIO2
 {
@@ -94,19 +107,34 @@ public:
 
 	~TPIO2();
 
+	void dump(std::ostream& s) const;
+
 	TPIO2TxSession* newTransaction();
 	bool tryCommit(TPIO2TxSession* tx);
 
-	PageIO* getBackend()
+	void rebase(bool force);
+	void refreshOldPages(page_id_t threshold);
+
+	PageIO* backend()
 	{
 		return m_backend.get();	
+	}
+
+	const TPIOStat& stat()
+	{
+		return m_stat;	
 	}
 
 private:
 	boost::shared_ptr<PageIO> m_backend;
 
 	ActiveOvr* m_aovr;
+
+	TPIOStat m_stat;
 };
+inline
+std::ostream& operator<<(std::ostream& s, const TPIO2& o)
+{ o.dump(s); return s; }
 
 inline
 bool
@@ -117,9 +145,9 @@ TPIO2TxSession::tryCommit()
 
 inline
 PageIO*
-TPIO2TxSession::getBackend() const
+TPIO2TxSession::backend() const
 {
-	return m_tpio->getBackend();
+	return m_tpio->backend();
 }
 
 } // end of namespace ptnk

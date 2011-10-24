@@ -10,8 +10,10 @@ operator<<(std::ostream& s, const OvrEntry& e)
 	return s;
 }
 
-LocalOvr::LocalOvr(OvrEntry* hashOvrs[], ver_t verRead)
-:	m_verRead(verRead), m_verWrite(0),
+LocalOvr::LocalOvr(OvrEntry* hashOvrs[], ver_t verRead, page_id_t pgidStartPage)
+:	m_pgidStartPageOrig(pgidStartPage),
+	m_pgidStartPage(pgidStartPage),
+	m_verRead(verRead), m_verWrite(0),
 	m_prev(NULL),
 	m_mergeOngoing(false), m_merged(false)
 {
@@ -67,11 +69,7 @@ LocalOvr::searchOvr(page_id_t pgid)
 void
 LocalOvr::addOvr(page_id_t pgidOrig, page_id_t pgidOvr)
 {
-	// add entry to m_pgidOrigs / Ovrs
-	{
-		m_pgidOrigs.push_back(pgidOrig);
-		m_pgidOvrs.push_back(pgidOvr);
-	}
+	m_pgidOrigs.push_back(pgidOrig);
 
 	// set up hash
 	{
@@ -93,6 +91,7 @@ LocalOvr::addOvr(page_id_t pgidOrig, page_id_t pgidOvr)
 bool
 LocalOvr::checkConflict(LocalOvr* other)
 {
+	if(other->m_pgidStartPage != m_pgidStartPageOrig) return false;
 	if(! other->m_bfOvrs.mayContain(m_bfOvrs)) return false;
 	
 	const int iE = m_pgidOrigs.size();
@@ -132,15 +131,11 @@ LocalOvr::dump(std::ostream& s) const
 	{
 		s << *it << std::endl;
 	}
-	s << "* m_pgidOvrs dump" << std::endl;
-	for(auto it = m_pgidOvrs.begin(); it != m_pgidOvrs.end(); ++ it)
-	{
-		s << *it << std::endl;
-	}
 }
 
 ActiveOvr::ActiveOvr()
 :	m_verRebase(1),
+	m_pgidStartPage(PGID_INVALID),
 	m_lovrVerifiedTip(NULL)
 {
 	for(int i = 0; i < TPIO_NHASH; ++ i)
@@ -176,14 +171,16 @@ unique_ptr<LocalOvr>
 ActiveOvr::newTx()
 {
 	ver_t verRead = m_verRebase;
+	page_id_t pgidStartPage = m_pgidStartPage;
 	for(LocalOvr* e = m_lovrVerifiedTip; e; e = e->m_prev)
 	{
 		if(! e->m_merged) continue;
 
 		verRead = e->m_verWrite;
+		pgidStartPage = e->m_pgidStartPage;
 		break;
 	}
-	return unique_ptr<LocalOvr>(new LocalOvr(m_hashOvrs, verRead));
+	return unique_ptr<LocalOvr>(new LocalOvr(m_hashOvrs, verRead, pgidStartPage));
 }
 
 bool

@@ -13,6 +13,8 @@ namespace ptnk
 
 class TPIO;
 class TPIOTxSession;
+class TPIO2;
+class TPIO2TxSession;
 
 class PageIO;
 
@@ -129,13 +131,13 @@ public:
 
 		void dumpStat() const;
 
-		TPIOTxSession* pio()
+		TPIO2TxSession* pio()
 		{
 			return m_pio.get();	
 		}
 
 	private:
-		Tx(DB* db, TPIOTxSession* pio);
+		Tx(DB* db, TPIO2TxSession* pio);
 
 		cursor_t* curNew(BufferCRef table);
 		cursor_t* curNew(TableOffCache* table);
@@ -143,7 +145,7 @@ public:
 		bool m_bCommitted;
 
 		DB* m_db;
-		boost::scoped_ptr<TPIOTxSession> m_pio;
+		boost::scoped_ptr<TPIO2TxSession> m_pio;
 
 		friend class DB;
 	};
@@ -163,14 +165,14 @@ public:
 
 	void dumpAll();
 
-	TPIO* tpio_()
+	TPIO2* tpio_()
 	{
-		return m_tpio.get();	
+		return m_tpio.get();
 	}
 
 private:
 	boost::shared_ptr<PageIO> m_pio;
-	boost::scoped_ptr<TPIO> m_tpio;
+	boost::scoped_ptr<TPIO2> m_tpio;
 };
 
 } // end of namespace ptnk

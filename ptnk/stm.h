@@ -56,29 +56,37 @@ private:
 class __attribute__ ((aligned (8))) LocalOvr
 {
 public:
-	LocalOvr(OvrEntry* hashOvrs[], ver_t verRead);
+	LocalOvr(OvrEntry* hashOvrs[], ver_t verRead, page_id_t pgidStartPage);
 	~LocalOvr();
+
+	void dump(std::ostream& s) const;
 
 	pair<page_id_t, ovr_status_t> searchOvr(page_id_t pgid);
 	void addOvr(page_id_t pgidOrig, page_id_t pgidOvr);
 
-	void dump(std::ostream& s) const;
-
 	class ExtraData
 	{
 	public:
-		virtual ~ExtraData() = 0;	
+		virtual ~ExtraData() { /* NOP */ }
 	};
-	void attachExtra(unique_ptr<ExtraData>&& extra);
+	void attachExtra(unique_ptr<ExtraData>&& extra)
+	{
+		m_extra = move(extra);	
+	}
 	ExtraData* getExtra() { return m_extra.get(); }
+
+	page_id_t pgidStartPage() const { return m_pgidStartPage; }
+	void setPgidStartPage(page_id_t pgid) { m_pgidStartPage = pgid; }
 
 private:
 	enum { TAG_TXVER_LOCAL = 0 };
 
 	Vpage_id_t m_pgidOrigs;
-	Vpage_id_t m_pgidOvrs;
 
 	OvrEntry* m_hashOvrs[TPIO_NHASH];
+
+	page_id_t m_pgidStartPageOrig;
+	page_id_t m_pgidStartPage;
 
 	PgidBloomFilter m_bfOvrs;
 
@@ -118,6 +126,7 @@ private:
 	OvrEntry* m_hashOvrs[TPIO_NHASH];
 
 	ver_t m_verRebase;
+	page_id_t m_pgidStartPage;
 
 	//! latest verified tx
 	/*!

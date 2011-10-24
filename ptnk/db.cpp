@@ -8,6 +8,7 @@
 #include "partitionedpageio.h"
 #include "btree.h"
 #include "tpio.h"
+#include "tpio2.h"
 #include "overview.h"
 #include "sysutils.h"
 
@@ -53,7 +54,7 @@ DB::drop(const char* filename)
 void
 DB::initCommon()
 {
-	m_tpio.reset(new TPIO(m_pio));
+	m_tpio.reset(new TPIO2(m_pio));
 
 	if(m_pio->needInit())
 	{
@@ -98,7 +99,7 @@ DB::newTransaction()
 	return tx;
 }
 
-DB::Tx::Tx(DB* db, TPIOTxSession* pio)
+DB::Tx::Tx(DB* db, TPIO2TxSession* pio)
 :	m_bCommitted(false),
 	m_db(db),
 	m_pio(pio)
@@ -235,7 +236,7 @@ inline
 DB::Tx::cursor_t*
 DB::Tx::curNew(BufferCRef table)
 {
-	std::auto_ptr<cursor_t> cur(new cursor_t);
+	unique_ptr<cursor_t> cur(new cursor_t);
 
 	OverviewPage pgOvv(m_pio->readPage(m_pio->pgidStartPage()));
 	cur->pgidRoot = pgOvv.getTableRoot(table);
@@ -250,7 +251,7 @@ inline
 DB::Tx::cursor_t*
 DB::Tx::curNew(TableOffCache* table)
 {
-	std::auto_ptr<cursor_t> cur(new cursor_t);
+	unique_ptr<cursor_t> cur(new cursor_t);
 
 	OverviewPage pgOvv(m_pio->readPage(m_pio->pgidStartPage()));
 	cur->pgidRoot = pgOvv.getTableRoot(table);
@@ -264,7 +265,7 @@ DB::Tx::curNew(TableOffCache* table)
 DB::Tx::cursor_t*
 DB::Tx::curFront(BufferCRef table)
 {
-	std::auto_ptr<cursor_t> cur(curNew(table));
+	unique_ptr<cursor_t> cur(curNew(table));
 
 	btree_cursor_front(cur->curBTree, cur->pgidRoot, m_pio.get());
 
@@ -281,7 +282,7 @@ DB::Tx::curFront(BufferCRef table)
 DB::Tx::cursor_t*
 DB::Tx::curBack(BufferCRef table)
 {
-	std::auto_ptr<cursor_t> cur(curNew(table));
+	unique_ptr<cursor_t> cur(curNew(table));
 
 	btree_cursor_back(cur->curBTree, cur->pgidRoot, m_pio.get());
 
@@ -298,7 +299,7 @@ DB::Tx::curBack(BufferCRef table)
 DB::Tx::cursor_t*
 DB::Tx::curQuery(BufferCRef table, const query_t& q)
 {
-	std::auto_ptr<cursor_t> cur(curNew(table));
+	unique_ptr<cursor_t> cur(curNew(table));
 
 	btree_query(cur->curBTree, cur->pgidRoot, q, m_pio.get());
 
@@ -315,7 +316,7 @@ DB::Tx::curQuery(BufferCRef table, const query_t& q)
 DB::Tx::cursor_t*
 DB::Tx::curFront(TableOffCache* table)
 {
-	std::auto_ptr<cursor_t> cur(curNew(table));
+	unique_ptr<cursor_t> cur(curNew(table));
 
 	btree_cursor_front(cur->curBTree, cur->pgidRoot, m_pio.get());
 
@@ -332,7 +333,7 @@ DB::Tx::curFront(TableOffCache* table)
 DB::Tx::cursor_t*
 DB::Tx::curBack(TableOffCache* table)
 {
-	std::auto_ptr<cursor_t> cur(curNew(table));
+	unique_ptr<cursor_t> cur(curNew(table));
 
 	btree_cursor_back(cur->curBTree, cur->pgidRoot, m_pio.get());
 
@@ -349,7 +350,7 @@ DB::Tx::curBack(TableOffCache* table)
 DB::Tx::cursor_t*
 DB::Tx::curQuery(TableOffCache* table, const query_t& q)
 {
-	std::auto_ptr<cursor_t> cur(curNew(table));
+	unique_ptr<cursor_t> cur(curNew(table));
 
 	btree_query(cur->curBTree, cur->pgidRoot, q, m_pio.get());
 
@@ -437,7 +438,7 @@ DB::Tx::tryCommit()
 void
 DB::Tx::dumpStat() const
 {
-	m_pio->stat().dump();
+	std::cout << *m_pio << std::endl;
 }
 
 void
@@ -471,8 +472,8 @@ DB::compact()
 	std::cout << "* starting compaction." << std::endl;
 
 	std::cout << "lastpgid: " << pgid2str(m_pio->getLastPgId()) << std::endl;
-	std::cout << "numuniqpgs: " << m_tpio->numUniquePages() << std::endl;
-	page_id_t threshold = m_pio->getLastPgId() - m_tpio->numUniquePages() * 3;
+	std::cout << "numuniqpgs: " << m_tpio->stat().nUniquePages << std::endl;
+	page_id_t threshold = m_pio->getLastPgId() - m_tpio->stat().nUniquePages * 3;
 	std::cout << "orig threshold : " << pgid2str(threshold) << std::endl;
 	threshold = ppio->alignCompactionThreshold(threshold);
 	std::cout << "aligned threshold : " << pgid2str(threshold) << std::endl;
@@ -493,7 +494,7 @@ DB::compact()
 void
 DB::dump() const
 {
-	boost::scoped_ptr<TPIOTxSession> tx(m_tpio->newTransaction());
+	boost::scoped_ptr<TPIO2TxSession> tx(m_tpio->newTransaction());
 	OverviewPage(tx->readPage(tx->pgidStartPage())).dump(tx.get());
 }
 
@@ -501,7 +502,7 @@ void
 DB::dumpGraph(FILE* fp) const
 {
 	fprintf(fp, "digraph bptree {\n");
-	boost::scoped_ptr<TPIOTxSession> tx(m_tpio->newTransaction());
+	boost::scoped_ptr<TPIO2TxSession> tx(m_tpio->newTransaction());
 	OverviewPage(tx->readPage(tx->pgidStartPage())).dumpGraph(fp, tx.get());
 	fprintf(fp, "}\n");
 }
@@ -509,7 +510,7 @@ DB::dumpGraph(FILE* fp) const
 void
 DB::dumpStat() const
 {
-	m_tpio->dumpStat();
+	std::cout << *m_tpio << std::endl;
 }
 
 void
@@ -517,7 +518,7 @@ DB::dumpAll()
 {
 	std::cout << "*** DB full dump ***" << std::endl;
 	{
-		boost::scoped_ptr<TPIOTxSession> tx(m_tpio->newTransaction());
+		boost::scoped_ptr<TPIO2TxSession> tx(m_tpio->newTransaction());
 		std::cout << "* overview pgid : " << tx->pgidStartPage() << std::endl;
 	}
 
