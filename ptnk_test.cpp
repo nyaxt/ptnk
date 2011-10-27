@@ -11,6 +11,7 @@
 #include "ptnk/btree_int.h"
 #include "ptnk/overview.h"
 #include "ptnk/tpio.h"
+#include "ptnk/tpio2.h"
 #include "ptnk/sysutils.h"
 
 #include <iostream>
@@ -2719,14 +2720,14 @@ TEST(ptnk, OverridesCB_getSpaceLeft)
 	EXPECT_EQ(OverridesCB::BUF_SIZE - 1 - OverridesCB::BUF_SIZE/2, ocb.getSpaceLeft(4, hint));
 }
 
-TEST(ptnk, TPIO_basic)
+TEST(ptnk, TPIO2_basic)
 {
 	boost::shared_ptr<PageIO> pio(new PageIOMem);
-	TPIO tpio(pio);
+	TPIO2 tpio(pio);
 
 	page_id_t pgid;
 	{
-		boost::scoped_ptr<TPIOTxSession> tx1(tpio.newTransaction());
+		unique_ptr<TPIO2TxSession> tx1(tpio.newTransaction());
 		
 		DebugPage pg(tx1->newInitPage<DebugPage>());
 		bool bOvr = false;
@@ -2742,8 +2743,8 @@ TEST(ptnk, TPIO_basic)
 	}
 
 	{
-		boost::scoped_ptr<TPIOTxSession> tx1(tpio.newTransaction());
-		boost::scoped_ptr<TPIOTxSession> tx2(tpio.newTransaction());
+		unique_ptr<TPIO2TxSession> tx1(tpio.newTransaction());
+		unique_ptr<TPIO2TxSession> tx2(tpio.newTransaction());
 		
 		DebugPage pg1(tx1->readPage(pgid));
 		ASSERT_EQ('a', pg1.get());
@@ -2776,11 +2777,11 @@ TEST(ptnk, TPIO_basic)
 TEST(ptnk, TPIO_multiupdate)
 {
 	boost::shared_ptr<PageIO> pio(new PageIOMem);
-	TPIO tpio(pio);
+	TPIO2 tpio(pio);
 
 	page_id_t pgid;
 	{
-		boost::scoped_ptr<TPIOTxSession> tx1(tpio.newTransaction());
+		unique_ptr<TPIO2TxSession> tx1(tpio.newTransaction());
 		
 		DebugPage pg(tx1->newInitPage<DebugPage>());
 		bool bOvr = false;
@@ -2796,7 +2797,7 @@ TEST(ptnk, TPIO_multiupdate)
 	}
 
 	{
-		boost::scoped_ptr<TPIOTxSession> tx1(tpio.newTransaction());
+		unique_ptr<TPIO2TxSession> tx1(tpio.newTransaction());
 			
 		DebugPage pg1(tx1->readPage(pgid));
 		ASSERT_EQ('a', pg1.get());
@@ -2825,7 +2826,7 @@ TEST(ptnk, TPIO_multiupdate)
 	}
 
 	{
-		boost::scoped_ptr<TPIOTxSession> tx1(tpio.newTransaction());
+		unique_ptr<TPIO2TxSession> tx1(tpio.newTransaction());
 		DebugPage pg1(tx1->readPage(pgid));
 		ASSERT_EQ('c', pg1.get()) << "mod not seen from other tx";
 	}
@@ -2834,10 +2835,10 @@ TEST(ptnk, TPIO_multiupdate)
 TEST(ptnk, TPIO_commitfail)
 {
 	boost::shared_ptr<PageIO> pio(new PageIOMem);
-	TPIO tpio(pio);
+	TPIO2 tpio(pio);
 
 	{
-		boost::scoped_ptr<TPIOTxSession> tx1(tpio.newTransaction());
+		unique_ptr<TPIO2TxSession> tx1(tpio.newTransaction());
 		
 		for(int i = 0; i < 10; ++ i)
 		{
@@ -2856,8 +2857,8 @@ TEST(ptnk, TPIO_commitfail)
 
 	for(int k = 0; k < 20; ++ k)
 	{
-		boost::scoped_ptr<TPIOTxSession> tx1(tpio.newTransaction());
-		boost::scoped_ptr<TPIOTxSession> tx2(tpio.newTransaction());
+		unique_ptr<TPIO2TxSession> tx1(tpio.newTransaction());
+		unique_ptr<TPIO2TxSession> tx2(tpio.newTransaction());
 
 		int x[3];
 		for(int j = 0; j < 3; ++ j)

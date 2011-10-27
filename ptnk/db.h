@@ -137,7 +137,7 @@ public:
 		}
 
 	private:
-		Tx(DB* db, TPIO2TxSession* pio);
+		Tx(DB* db, unique_ptr<TPIO2TxSession> pio);
 
 		cursor_t* curNew(BufferCRef table);
 		cursor_t* curNew(TableOffCache* table);
@@ -145,7 +145,7 @@ public:
 		bool m_bCommitted;
 
 		DB* m_db;
-		boost::scoped_ptr<TPIO2TxSession> m_pio;
+		unique_ptr<TPIO2TxSession> m_pio;
 
 		friend class DB;
 	};

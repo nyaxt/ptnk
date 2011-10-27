@@ -60,6 +60,7 @@ using std::pair;
 using std::make_pair;
 
 using std::unique_ptr;
+using std::shared_ptr;
 using std::tie;
 
 // === misc template utils ===

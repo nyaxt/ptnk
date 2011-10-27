@@ -47,6 +47,11 @@ public:
 
 	bool tryCommit();
 
+	const TPIOStat& stat() const
+	{
+		return m_stat;	
+	}
+
 	// ====== implements PageIO interface ======
 	pair<Page, page_id_t> newPage();
 
@@ -77,23 +82,31 @@ protected:
 	friend class TPIO2; // give access to c-tor
 	TPIO2TxSession(TPIO2* tpio, unique_ptr<LocalOvr>&& lovr);
 
-	TPIO2* m_tpio;
 	PageIO* backend() const;
 
-	unique_ptr<LocalOvr> m_lovr;
+	PagesOldLink* oldlink()
+	{
+		return &reinterpret_cast<OvrExtra*>(m_lovr->getExtra())->oldlink;
+	};
+
+	void addOvr(page_id_t pgidOrig, page_id_t pgidOvr)
+	{
+		m_lovr->addOvr(pgidOrig, pgidOvr);	
+	}
+
+	void loadStreak(BufferCRef bufStreak);
+
+private:
 	struct OvrExtra : public LocalOvr::ExtraData
 	{
 		~OvrExtra();
 
 		PagesOldLink oldlink;
 	};
-	PagesOldLink* getOldLink()
-	{
-		return &reinterpret_cast<OvrExtra*>(m_lovr->getExtra())->oldlink;
-	};
 
+	TPIO2* m_tpio;
+	unique_ptr<LocalOvr> m_lovr;
 	Vpage_id_t m_pagesModified;
-
 	TPIOStat m_stat;
 };
 inline
@@ -109,8 +122,8 @@ public:
 
 	void dump(std::ostream& s) const;
 
-	TPIO2TxSession* newTransaction();
-	bool tryCommit(TPIO2TxSession* tx);
+	unique_ptr<TPIO2TxSession> newTransaction();
+	bool tryCommit(TPIO2TxSession* tx, ver_t verW = TXID_INVALID);
 
 	void rebase(bool force);
 	void refreshOldPages(page_id_t threshold);
@@ -126,9 +139,13 @@ public:
 	}
 
 private:
+	void syncDelayed(const Vpage_id_t& pagesModified);
+
+	void restoreState();
+
 	boost::shared_ptr<PageIO> m_backend;
 
-	ActiveOvr* m_aovr;
+	shared_ptr<ActiveOvr> m_aovr;
 
 	TPIOStat m_stat;
 };

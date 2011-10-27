@@ -112,11 +112,11 @@ std::ostream& operator<<(std::ostream& s, const LocalOvr& o)
 class ActiveOvr
 {
 public:
-	ActiveOvr();
+	ActiveOvr(page_id_t pgidStartPage = PGID_INVALID, ver_t verBase = 1);
 	~ActiveOvr();
 
 	unique_ptr<LocalOvr> newTx();
-	bool tryCommit(unique_ptr<LocalOvr>& lovr);
+	ver_t tryCommit(unique_ptr<LocalOvr>& lovr, ver_t verW = TXID_INVALID);
 
 	void dump(std::ostream& s) const;
 
@@ -125,8 +125,8 @@ private:
 
 	OvrEntry* m_hashOvrs[TPIO_NHASH];
 
-	ver_t m_verRebase;
 	page_id_t m_pgidStartPage;
+	ver_t m_verBase;
 
 	//! latest verified tx
 	/*!

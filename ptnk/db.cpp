@@ -99,10 +99,10 @@ DB::newTransaction()
 	return tx;
 }
 
-DB::Tx::Tx(DB* db, TPIO2TxSession* pio)
+DB::Tx::Tx(DB* db, unique_ptr<TPIO2TxSession> pio)
 :	m_bCommitted(false),
 	m_db(db),
-	m_pio(pio)
+	m_pio(move(pio))
 {
 	/* NOP */
 }
@@ -494,7 +494,7 @@ DB::compact()
 void
 DB::dump() const
 {
-	boost::scoped_ptr<TPIO2TxSession> tx(m_tpio->newTransaction());
+	unique_ptr<TPIO2TxSession> tx(m_tpio->newTransaction());
 	OverviewPage(tx->readPage(tx->pgidStartPage())).dump(tx.get());
 }
 
@@ -502,7 +502,7 @@ void
 DB::dumpGraph(FILE* fp) const
 {
 	fprintf(fp, "digraph bptree {\n");
-	boost::scoped_ptr<TPIO2TxSession> tx(m_tpio->newTransaction());
+	unique_ptr<TPIO2TxSession> tx(m_tpio->newTransaction());
 	OverviewPage(tx->readPage(tx->pgidStartPage())).dumpGraph(fp, tx.get());
 	fprintf(fp, "}\n");
 }
@@ -518,7 +518,7 @@ DB::dumpAll()
 {
 	std::cout << "*** DB full dump ***" << std::endl;
 	{
-		boost::scoped_ptr<TPIO2TxSession> tx(m_tpio->newTransaction());
+		unique_ptr<TPIO2TxSession> tx(m_tpio->newTransaction());
 		std::cout << "* overview pgid : " << tx->pgidStartPage() << std::endl;
 	}
 

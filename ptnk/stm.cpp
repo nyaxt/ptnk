@@ -1,4 +1,5 @@
 #include "stm.h"
+#include "exceptions.h"
 
 namespace ptnk
 {
@@ -133,9 +134,9 @@ LocalOvr::dump(std::ostream& s) const
 	}
 }
 
-ActiveOvr::ActiveOvr()
-:	m_verRebase(1),
-	m_pgidStartPage(PGID_INVALID),
+ActiveOvr::ActiveOvr(page_id_t pgidStartPage, ver_t verBase)
+:	m_pgidStartPage(pgidStartPage),	
+	m_verBase(verBase),
 	m_lovrVerifiedTip(NULL)
 {
 	for(int i = 0; i < TPIO_NHASH; ++ i)
@@ -170,7 +171,7 @@ ActiveOvr::~ActiveOvr()
 unique_ptr<LocalOvr>
 ActiveOvr::newTx()
 {
-	ver_t verRead = m_verRebase;
+	ver_t verRead = m_verBase;
 	page_id_t pgidStartPage = m_pgidStartPage;
 	for(LocalOvr* e = m_lovrVerifiedTip; e; e = e->m_prev)
 	{
@@ -183,8 +184,8 @@ ActiveOvr::newTx()
 	return unique_ptr<LocalOvr>(new LocalOvr(m_hashOvrs, verRead, pgidStartPage));
 }
 
-bool
-ActiveOvr::tryCommit(unique_ptr<LocalOvr>& plovr)
+ver_t
+ActiveOvr::tryCommit(unique_ptr<LocalOvr>& plovr, ver_t verW)
 {
 	LocalOvr* lovr = plovr.get();
 
@@ -196,14 +197,22 @@ ActiveOvr::tryCommit(unique_ptr<LocalOvr>& plovr)
 		{
 			LocalOvr* lovrPrev = m_lovrVerifiedTip;
 			lovr->m_prev = lovrPrev;
-			lovr->m_verWrite = (lovrPrev ? lovrPrev->m_verWrite : m_verRebase) + 1;
+			lovr->m_verWrite = (lovrPrev ? lovrPrev->m_verWrite : m_verBase) + 1;
+			if(verW != TXID_INVALID)
+			{
+				PTNK_CHECK(lovr->m_verWrite <= verW);
+				lovr->m_verWrite = verW;
+			}
 			__sync_synchronize(); // lovr->m_prev must be set BEFORE tip ptr CAS swing below
 
+			// check conflict with txs committed after read snapshot
 			for(LocalOvr* lovrBefore = lovrPrev; lovrBefore && lovrBefore != lovrVerified; lovrBefore = lovrBefore->m_prev)
 			{
 				if(lovr->m_verRead >= lovrBefore->m_verWrite)
 				{
-					break;
+					// lovrBefore is tx before read snapshot. It does not conflict.
+
+					break; // exit loop as older tx is also expected to be before read snapshot
 				}
 
 				if(lovr->checkConflict(lovrBefore))
@@ -213,7 +222,7 @@ ActiveOvr::tryCommit(unique_ptr<LocalOvr>& plovr)
 					// abort commit
 					lovr->m_prev = nullptr;
 					lovr->m_verWrite = 0;
-					return false;
+					return TXID_INVALID;
 				}
 			}
 			lovrVerified = lovrPrev;
@@ -221,6 +230,9 @@ ActiveOvr::tryCommit(unique_ptr<LocalOvr>& plovr)
 			if(__sync_bool_compare_and_swap(&m_lovrVerifiedTip, lovrPrev, lovr))
 			{
 				// CAS succeed and _lovr_ has been successfully added to list of verified txs...
+
+				// memo the tx ver
+				verW = lovr->m_verWrite;
 				
 				break; // step 1 done!
 			}
@@ -255,7 +267,7 @@ ActiveOvr::tryCommit(unique_ptr<LocalOvr>& plovr)
 	}
 
 	plovr.release();
-	return true;
+	return verW;
 }
 
 void
@@ -306,7 +318,7 @@ void
 ActiveOvr::dump(std::ostream& s) const
 {
 	s << "*** ActiveOvr dump" << std::endl;
-	s << "verRebase: " << m_verRebase << std::endl;
+	s << "verBase: " << m_verBase << std::endl;
 	s << "last verified tip: " << std::endl;
 	s << *m_lovrVerifiedTip << std::endl;
 }
