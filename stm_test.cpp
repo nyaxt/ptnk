@@ -102,6 +102,28 @@ TEST(ptnk, stm_basic)
 	}
 }
 
+TEST(ptnk, stm_hash_collision_ci)
+{
+	ActiveOvr ao;
+
+	{
+		std::unique_ptr<LocalOvr> lo(ao.newTx());
+		lo->addOvr(0, 1);
+		lo->addOvr(0 + TPIO_NHASH, 2);
+		lo->addOvr(0 + TPIO_NHASH*2, 3);
+		
+		ao.tryCommit(lo);
+		EXPECT_FALSE(lo.get());
+	}
+
+	{
+		std::unique_ptr<LocalOvr> lo(ao.newTx());
+		EXPECT_EQ((page_id_t)1, lo->searchOvr(0).first);
+		EXPECT_EQ((page_id_t)2, lo->searchOvr(0 + TPIO_NHASH).first);
+		EXPECT_EQ((page_id_t)3, lo->searchOvr(0 + TPIO_NHASH*2).first);
+	}
+}
+
 TEST(ptnk, stm_multithread)
 {
 	ActiveOvr ao;

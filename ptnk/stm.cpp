@@ -306,7 +306,7 @@ ActiveOvr::merge(LocalOvr* lovr)
 			laste->prev = m_hashOvrs[roti];
 			__sync_synchronize();
 
-			m_hashOvrs[roti] = laste;
+			m_hashOvrs[roti] = lovr->m_hashOvrs[roti];
 		}
 	}
 

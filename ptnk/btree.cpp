@@ -8,6 +8,14 @@
 namespace ptnk
 {
 
+const char*
+dat2str(BufferCRef buf)
+{
+	static char tmp[32];
+	sprintf(tmp, "%u", __builtin_bswap32(*(int*)buf.get()));
+	return tmp;
+}
+
 static bool btree_cursor_prevleaf(btree_cursor_t* cur, PageIO* pio);
 static bool btree_cursor_nextleaf(btree_cursor_t* cur, PageIO* pio);
 static bool dktree_cursor_nextdkleaf(btree_cursor_t* cur, PageIO* pio);
@@ -678,7 +686,7 @@ Node::dumpGraph_(FILE* fp, PageIO* pio) const
 		
 		if(i < numKeys)
 		{
-			fprintf(fp, "<TD>%u</TD>", *(int*)k.get());
+			fprintf(fp, "<TD>%s</TD>", dat2str(k));
 		}
 		fprintf(fp, "<TD PORT=\"p%u\" BGCOLOR=\"yellow\"><FONT COLOR=\"blue\">%u</FONT></TD>", i, (unsigned int)p);
 	}
@@ -1991,6 +1999,7 @@ Leaf::dump_() const
 void
 Leaf::dumpGraph_(FILE* fp) const
 {
+#if 0
 	fprintf(fp, "\"page%u\" [\n", (unsigned int)pageId());
 	fprintf(fp, "label = <<TABLE><TR>");
 	fprintf(fp, "<TD PORT=\"head\">Leaf [%u]</TD>", (unsigned int)pageId());
@@ -2005,6 +2014,7 @@ Leaf::dumpGraph_(FILE* fp) const
 	}
 	fprintf(fp, "</TR></TABLE>>\nshape=plaintext\n");
 	fprintf(fp, "];\n");
+#endif
 }
 
 namespace 

@@ -2,6 +2,8 @@
 #include "streak.h"
 
 #define TXSESSION_BATCH_SYNC
+// #define DEBUG_VERBOSE_TPIOPIO
+#define DEBUG_VERBOSE_RESTORESTATE
 
 namespace ptnk
 {
@@ -54,6 +56,9 @@ TPIO2TxSession::readPage(page_id_t pgid)
 
 	page_id_t pgidOvr; ovr_status_t st;
 	tie(pgidOvr, st) = m_lovr->searchOvr(pgid);
+#ifdef DEBUG_VERBOSE_TPIOPIO
+	// std::cout << "readPage " << pgid2str(pgid) << " -> " << pgid2str(pgidOvr) << " st: " << st << std::endl;
+#endif
 
 	Page pg = backend()->readPage(pgidOvr);
 	if(st != OVR_NONE)
@@ -99,10 +104,16 @@ TPIO2TxSession::modifyPage(const Page& page, mod_info_t* mod)
 
 		addOvr(mod->idOrig, mod->idOvr);
 		
+#ifdef DEBUG_VERBOSE_TPIOPIO
+		std::cout << "modifyPage " << pgid2str(mod->idOrig) << " -> " << pgid2str(mod->idOvr) << std::endl;
+#endif
 		return ovr;
 	}
 	else
 	{
+#ifdef DEBUG_VERBOSE_TPIOPIO
+		std::cout << "modifyPage " << pgid2str(page.pageOrigId()) << " (already mutable)" << std::endl;
+#endif
 		mod->reset();
 
 		return page;
@@ -126,6 +137,9 @@ TPIO2TxSession::sync(page_id_t pgid)
 {
 	++ m_stat.nSync;
 	
+#ifdef DEBUG_VERBOSE_TPIOPIO
+	std::cout << "sync " << pgid2str(pgid) << std::endl;
+#endif
 	m_pagesModified.push_back(pgid);
 	// sync to backend is delayed to after commit
 }
@@ -305,6 +319,9 @@ TPIO2::restoreState()
 
 	// 1. scan the log backwards until rebase tx AND start page is found
 	// remember the pages found in the process -> pagevers
+#ifdef DEBUG_VERBOSE_RESTORESTATE
+	printf("restore phase1 start\n");
+#endif
 	ver_t verBase = 1;
 	VPageVer pagevers;
 	PTNK_BKWD_SCAN(m_backend)
@@ -332,10 +349,7 @@ TPIO2::restoreState()
 			//        However, this may not be the case in future.
 		}
 		
-		if(verBase != 1)
-		{
-			pagevers.push_back((PageVer){pgid, ver});
-		}
+		pagevers.push_back((PageVer){pgid, ver});
 
 		if(ver < verBase && pgidStartPage != PGID_INVALID)
 		{
@@ -348,44 +362,56 @@ TPIO2::restoreState()
 	{
 		PTNK_THROW_RUNTIME_ERR("TPIO::restoreState: could not find start page");	
 	}
+#ifdef DEBUG_VERBOSE_RESTORESTATE
+	printf("restore phase1 end. pgidStartPage: %d, verBase: %d\n", pgidStartPage, verBase);
+#endif
 
 	// 2. sort the pages found while scan by its version
 	std::sort(pagevers.begin(), pagevers.end());
-	VPageVer::const_reverse_iterator it = pagevers.rbegin(), itE = pagevers.rend();
 
 	// 3. for each pages found in the scan, sorted by its version,
 	//    add ovr entries and handle streak data per tx
 	m_aovr = unique_ptr<ActiveOvr>(new ActiveOvr(pgidStartPage, verBase));
 	unique_ptr<TPIO2TxSession> tx = newTransaction();
-	tx_id_t verCurrent = verBase;
+	tx_id_t verCurrent = pagevers.back().ver;
 	Buffer bufStreak; bufStreak.reset();
+
+	VPageVer::const_reverse_iterator it = pagevers.rbegin(), itE = pagevers.rend();
 	for(; it != itE; ++ it)
 	{
 		if(it->ver != verCurrent)
 		{
 			// new tx begins...
-
+#ifdef DEBUG_VERBOSE_RESTORESTATE
+			printf("replay tx %d before new one begins\n", verCurrent);
+#endif
 			// commit current tx
 			// -- streak
 			tx->loadStreak(bufStreak.rref());
 			bufStreak.reset();
-			verCurrent = it->ver;
 
 			// -- ovr entries
-			PTNK_CHECK(tryCommit(tx.get(), verCurrent));
+			PTNK_CHECK(verCurrent == m_aovr->tryCommit(tx->m_lovr, verCurrent));
 			tx = newTransaction();
+
+			verCurrent = it->ver;
 		}
 
 		Page pg(m_backend->readPage(it->pgid));
-		// std::cout << "ver: " << it->ver << " pgid: " << it->pgid << std::endl;
+#ifdef DEBUG_VERBOSE_RESTORESTATE
+		std::cout << "ver: " << it->ver << " pgid: " << it->pgid << std::endl;
+#endif
 	
 		// -- ovr entries
-		if(it->ver != verBase)
+		if(it->ver > verBase)
 		{
 			page_id_t orig = pg.pageOvrTgt();
 			if(orig != PGID_INVALID)
 			{
 				// new ovr entry found
+#ifdef DEBUG_VERBOSE_RESTORESTATE
+				printf("- add ovr entry %d -> %d\n", orig, it->pgid);
+#endif
 				tx->addOvr(orig, it->pgid);
 			}
 		}
@@ -403,14 +429,17 @@ TPIO2::restoreState()
 			bufStreak.append(ospg.read());
 		}
 	}
+#ifdef DEBUG_VERBOSE_RESTORESTATE
+	printf("replay tx %d (last one)\n", verCurrent);
+#endif
 	tx->loadStreak(bufStreak.rref());
-	PTNK_CHECK(tryCommit(tx.get(), verCurrent));
+	PTNK_CHECK(verCurrent == m_aovr->tryCommit(tx->m_lovr, verCurrent));
 }
 
 void
 TPIO2::rebase(bool force)
 {
-	std::cerr << "FIXME: TPIO2::rebase not yet implemented!" << std::endl;
+	// std::cerr << "FIXME: TPIO2::rebase not yet implemented!" << std::endl;
 }
 
 void
