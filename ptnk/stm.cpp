@@ -279,7 +279,7 @@ ActiveOvr::merge(LocalOvr* lovr)
 		// wait until merge complete
 		while(! lovr->m_merged)
 		{
-			 asm volatile("": : :"memory"); // force re-read
+			PTNK_MEMBARRIER_COMPILER;
 		}
 
 		return;

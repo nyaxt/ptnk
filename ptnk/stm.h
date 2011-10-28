@@ -9,6 +9,8 @@
 namespace ptnk
 {
 
+#define PTNK_MEMBARRIER_COMPILER asm volatile("": : :"memory"); 
+
 typedef tx_id_t ver_t;
 
 enum { TPIO_NHASH = 64 };
@@ -119,6 +121,13 @@ public:
 	ver_t tryCommit(unique_ptr<LocalOvr>& lovr, ver_t verW = TXID_INVALID);
 
 	void dump(std::ostream& s) const;
+
+	// ====== accessor methods ======
+	
+	ver_t verBase() const
+	{
+		return m_verBase;
+	}
 
 private:
 	void merge(LocalOvr* lovr);

@@ -19,7 +19,7 @@ struct TPIOStat
 	unsigned int nReadOvrLocal;
 
 	unsigned int nModifyPage;
-	unsigned int nNewOvr;
+	unsigned int nOvr;
 
 	unsigned int nSync;
 
@@ -30,10 +30,12 @@ struct TPIOStat
 		nReadOvr(0),
 		nReadOvrLocal(0),
 		nModifyPage(0),
-		nNewOvr(0),
+		nOvr(0),
 		nSync(0),
 		nNotifyOldLink(0)
 	{ /* NOP */ }
+
+	void merge(const TPIOStat& o);
 };
 
 class TPIO2;
@@ -113,10 +115,12 @@ inline
 std::ostream& operator<<(std::ostream& s, const TPIO2TxSession& o)
 { o.dump(s); return s; }
 
+constexpr unsigned int REBASE_THRESHOLD = TPIO_NHASH * 16;
+
 class TPIO2
 {
 public:
-	TPIO2(boost::shared_ptr<PageIO> backend);
+	TPIO2(shared_ptr<PageIO> backend);
 
 	~TPIO2();
 
@@ -139,15 +143,37 @@ public:
 	}
 
 private:
+	class RebaseTPIO2TxSession : public TPIO2TxSession
+	{
+	public:
+		RebaseTPIO2TxSession(TPIO2* tpio, unique_ptr<LocalOvr>&& lovr, const PagesOldLink* oldlink);
+		~RebaseTPIOTxSession();
+
+		page_id_t updateLink(page_id_t idOld);
+		page_id_t rebaseForceVisit(page_id_t pgid);
+
+	private:
+		page_id_t rebaseVisit(page_id_t pgid);
+
+		Spage_id_t m_visited;
+		const PagesOldLink* m_oldlink;
+	}
+
 	void syncDelayed(const Vpage_id_t& pagesModified);
 
 	void restoreState();
 
-	boost::shared_ptr<PageIO> m_backend;
+	shared_ptr<PageIO> m_backend;
 
 	shared_ptr<ActiveOvr> m_aovr;
 
 	TPIOStat m_stat;
+
+	//! true if rebase is being done (further tx are cancelled)
+	bool m_bDuringRebase;
+
+	boost::mutex m_mtxRebase;
+	boost::condition m_condRebase;
 };
 inline
 std::ostream& operator<<(std::ostream& s, const TPIO2& o)

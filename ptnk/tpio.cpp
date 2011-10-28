@@ -984,7 +984,7 @@ TPIO::RebaseTPIOTxSession::rebaseForceVisit(page_id_t pgid)
 page_id_t
 TPIO::RebaseTPIOTxSession::rebaseVisit(page_id_t pgid)
 {
-	if(! m_tpio->m_oldlink.contains(pgid))
+	if(! m_oldlink.contains(pgid))
 	{
 		// no need to visit
 		return pgid;
@@ -993,7 +993,7 @@ TPIO::RebaseTPIOTxSession::rebaseVisit(page_id_t pgid)
 	if(m_visited.find(pgid) != m_visited.end())
 	{
 		// already visited
-		return pgid;	
+		return pgid;
 	}
 
 	return rebaseForceVisit(pgid);
