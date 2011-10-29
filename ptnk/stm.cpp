@@ -16,11 +16,22 @@ LocalOvr::LocalOvr(OvrEntry* hashOvrs[], ver_t verRead, page_id_t pgidStartPage)
 	m_pgidStartPage(pgidStartPage),
 	m_verRead(verRead), m_verWrite(0),
 	m_prev(NULL),
-	m_mergeOngoing(false), m_merged(false)
+	m_mergeOngoing(false), m_merged(false),
+	m_bTerminator(false)
 {
-	for(int i = 0; i < TPIO_NHASH; ++ i)
+	if(hashOvrs)
 	{
-		m_hashOvrs[i] = hashOvrs[i];
+		for(int i = 0; i < TPIO_NHASH; ++ i)
+		{
+			m_hashOvrs[i] = hashOvrs[i];
+		}
+	}
+	else
+	{
+		for(int i = 0; i < TPIO_NHASH; ++ i)
+		{
+			m_hashOvrs[i] = nullptr;
+		}
 	}
 }
 
@@ -92,6 +103,9 @@ LocalOvr::addOvr(page_id_t pgidOrig, page_id_t pgidOvr)
 bool
 LocalOvr::checkConflict(LocalOvr* other)
 {
+	// tx may not committed after terminator
+	if(other->m_bTerminator) return false;
+
 	if(other->m_pgidStartPage != m_pgidStartPageOrig) return false;
 	if(! other->m_bfOvrs.mayContain(m_bfOvrs)) return false;
 	
@@ -150,7 +164,7 @@ ActiveOvr::~ActiveOvr()
 	for(LocalOvr* lovr = m_lovrVerifiedTip; lovr;)
 	{
 		LocalOvr* prev = lovr->m_prev;
-		if(lovr->m_merged)
+		if(lovr->isMerged() || lovr->m_bTerminator)
 		{
 			delete lovr;
 		}
@@ -175,13 +189,98 @@ ActiveOvr::newTx()
 	page_id_t pgidStartPage = m_pgidStartPage;
 	for(LocalOvr* e = m_lovrVerifiedTip; e; e = e->m_prev)
 	{
-		if(! e->m_merged) continue;
+		if(! e->isMerged()) continue;
 
 		verRead = e->m_verWrite;
 		pgidStartPage = e->m_pgidStartPage;
 		break;
 	}
 	return unique_ptr<LocalOvr>(new LocalOvr(m_hashOvrs, verRead, pgidStartPage));
+}
+
+void
+ActiveOvr::terminate()
+{
+	// 1. put terminator lovr on tip to prevent further commit
+	LocalOvr* terminator = new LocalOvr(nullptr, 0, 0);
+	terminator->setTerminator();
+
+	LocalOvr* currtip;
+	do
+	{
+		currtip = m_lovrVerifiedTip;
+		terminator->m_prev = currtip;
+		__sync_synchronize(); // terminator->m_prev must be set BEFORE tip ptr CAS swing below
+	}
+	while(! __sync_bool_compare_and_swap(&m_lovrVerifiedTip, currtip, terminator));
+
+	// 2. merge upto current tip
+	mergeUpto(currtip);
+}
+
+void
+ActiveOvr::merge(LocalOvr* lovr)
+{
+	// FIXME: really implement the concurrent merge
+	if(! __sync_bool_compare_and_swap(&lovr->m_mergeOngoing, false, true))
+	{
+		// wait until merge complete
+		while(! lovr->isMerged())
+		{
+			PTNK_MEMBARRIER_COMPILER;
+		}
+
+		return;
+	}
+
+	const ver_t verWrite = lovr->m_verWrite;
+
+	// int off = rand();
+	for(int i = 0; i < TPIO_NHASH; ++ i)
+	{
+		int roti = i; //(i + off) % TPIO_NHASH;
+
+		// find the last entry of local ovrs and fill e->ver fields
+		OvrEntry* laste = NULL;
+		for(OvrEntry* e = lovr->m_hashOvrs[roti]; e && e->ver == LocalOvr::TAG_TXVER_LOCAL; e = e->prev)
+		{
+			laste = e;
+			e->ver = verWrite;
+		}
+
+		// append the local ovrs list to the current list
+		if(laste)
+		{
+			laste->prev = m_hashOvrs[roti];
+			__sync_synchronize();
+
+			m_hashOvrs[roti] = lovr->m_hashOvrs[roti];
+		}
+	}
+
+	__sync_synchronize(); // m_merged must be set after actual merge finishes
+	lovr->m_merged = true;
+}
+
+void
+ActiveOvr::mergeUpto(LocalOvr* lovrTip)
+{
+	// step 1: create vector of un-merged txs 
+	std::vector<LocalOvr*> lovrsUnmerged;
+	for(LocalOvr* o = lovrTip; o && !o->isMerged(); o = o->m_prev)
+	{
+		lovrsUnmerged.push_back(o);
+	}
+
+	// step 2: merge txs older one first
+	typedef std::vector<LocalOvr*>::const_reverse_iterator it_t;
+	for(it_t it = lovrsUnmerged.rbegin(); it != lovrsUnmerged.rend(); ++ it)
+	{
+		LocalOvr* o = *it;
+
+		if(o->isMerged()) continue; // skip merged tx
+		merge(o);
+	}
 }
 
 ver_t
@@ -200,7 +299,11 @@ ActiveOvr::tryCommit(unique_ptr<LocalOvr>& plovr, ver_t verW)
 			lovr->m_verWrite = (lovrPrev ? lovrPrev->m_verWrite : m_verBase) + 1;
 			if(verW != TXID_INVALID)
 			{
-				PTNK_CHECK(lovr->m_verWrite <= verW);
+				PTNK_CHECK(lovr->m_verWrite <= verW)
+				{
+					std::cout << "lovr->m_verWrite: " << lovr->m_verWrite << std::endl;
+					std::cout << "verW: " << verW << std::endl;
+				}
 				lovr->m_verWrite = verW;
 			}
 			__sync_synchronize(); // lovr->m_prev must be set BEFORE tip ptr CAS swing below
@@ -247,72 +350,12 @@ ActiveOvr::tryCommit(unique_ptr<LocalOvr>& plovr, ver_t verW)
 
 	// step 2: merge _lovr_
 	//         if there are any not yet merged txs, apply that first
-	{
-		// step 2.1: create vector of un-merged txs 
-		std::vector<LocalOvr*> lovrsUnmerged;
-		for(LocalOvr* o = lovr; o && !o->m_merged; o = o->m_prev)
-		{
-			lovrsUnmerged.push_back(o);
-		}
-
-		// step 2.2: merge txs older one first
-		typedef std::vector<LocalOvr*>::const_reverse_iterator it_t;
-		for(it_t it = lovrsUnmerged.rbegin(); it != lovrsUnmerged.rend(); ++ it)
-		{
-			LocalOvr* o = *it;
-
-			if(o->m_merged)	continue; // skip merged tx
-			merge(o);
-		}
-	}
+	mergeUpto(lovr);
 
 	plovr.release();
 	return verW;
 }
 
-void
-ActiveOvr::merge(LocalOvr* lovr)
-{
-	// FIXME: really implement the concurrent merge
-	if(! __sync_bool_compare_and_swap(&lovr->m_mergeOngoing, false, true))
-	{
-		// wait until merge complete
-		while(! lovr->m_merged)
-		{
-			PTNK_MEMBARRIER_COMPILER;
-		}
-
-		return;
-	}
-
-	const ver_t verWrite = lovr->m_verWrite;
-
-	// int off = rand();
-	for(int i = 0; i < TPIO_NHASH; ++ i)
-	{
-		int roti = i; //(i + off) % TPIO_NHASH;
-
-		// find the last entry of local ovrs and fill e->ver fields
-		OvrEntry* laste = NULL;
-		for(OvrEntry* e = lovr->m_hashOvrs[roti]; e && e->ver == LocalOvr::TAG_TXVER_LOCAL; e = e->prev)
-		{
-			laste = e;
-			e->ver = verWrite;
-		}
-
-		// append the local ovrs list to the current list
-		if(laste)
-		{
-			laste->prev = m_hashOvrs[roti];
-			__sync_synchronize();
-
-			m_hashOvrs[roti] = lovr->m_hashOvrs[roti];
-		}
-	}
-
-	__sync_synchronize(); // m_merged must be set after actual merge finishes
-	lovr->m_merged = true;
-}
 
 void
 ActiveOvr::dump(std::ostream& s) const

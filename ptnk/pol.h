@@ -2,6 +2,7 @@
 #define _ptnk_pol_h_
 
 #include "types.h"
+#include "buffer.h"
 
 #include <boost/foreach.hpp>
 
@@ -64,12 +65,17 @@ public:
 		}
 	}
 
+	void dumpStr(std::ostream& s) const;
+
 private:
 	//! pages with links to already overrode pages
 	Spage_id_t m_impl;
 
 	friend class TPIO;
 };
+inline
+std::ostream& operator<<(std::ostream& s, const PagesOldLink& o)
+{ o.dumpStr(s); return s; }
 
 } // end of namespace ptnk
 

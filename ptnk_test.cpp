@@ -2722,7 +2722,7 @@ TEST(ptnk, OverridesCB_getSpaceLeft)
 
 TEST(ptnk, TPIO2_basic)
 {
-	boost::shared_ptr<PageIO> pio(new PageIOMem);
+	shared_ptr<PageIO> pio(new PageIOMem);
 	TPIO2 tpio(pio);
 
 	page_id_t pgid;
@@ -2776,7 +2776,7 @@ TEST(ptnk, TPIO2_basic)
 
 TEST(ptnk, TPIO_multiupdate)
 {
-	boost::shared_ptr<PageIO> pio(new PageIOMem);
+	shared_ptr<PageIO> pio(new PageIOMem);
 	TPIO2 tpio(pio);
 
 	page_id_t pgid;
@@ -2834,7 +2834,7 @@ TEST(ptnk, TPIO_multiupdate)
 
 TEST(ptnk, TPIO_commitfail)
 {
-	boost::shared_ptr<PageIO> pio(new PageIOMem);
+	shared_ptr<PageIO> pio(new PageIOMem);
 	TPIO2 tpio(pio);
 
 	{

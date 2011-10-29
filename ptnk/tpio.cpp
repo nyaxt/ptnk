@@ -370,33 +370,6 @@ OverridesCB::schash(page_id_t pgid)
 	return static_cast<unsigned int>(hashs(pgid, 0)) & (HASH_RANGE-1);
 }
 
-PagesOldLink::PagesOldLink()
-{
-	/* NOP */
-}
-
-PagesOldLink::~PagesOldLink()
-{
-	/* NOP */
-}
-
-// #define DUMP_POL_UPD
-
-void
-PagesOldLink::merge(const PagesOldLink& o)
-{
-	// add entries in o
-	std::copy(o.m_impl.begin(), o.m_impl.end(), std::inserter(m_impl, m_impl.begin()));
-
-#ifdef DUMP_POL_UPD
-	std::cout << "dump upd" << std::endl;
-	BOOST_FOREACH(const entry_t& e, m_impl)
-	{
-		std::cout << "e pgid: " << e.pgid << " dep: " << e.pgidDep << std::endl;
-	}
-#endif // DUMP_POL_UPD
-}
-
 OverridesCache::OverridesCache()
 :	m_impl(NUM_CACHE_ENTRY)
 {
@@ -984,7 +957,7 @@ TPIO::RebaseTPIOTxSession::rebaseForceVisit(page_id_t pgid)
 page_id_t
 TPIO::RebaseTPIOTxSession::rebaseVisit(page_id_t pgid)
 {
-	if(! m_oldlink.contains(pgid))
+	if(! m_oldlinkLocal.contains(pgid))
 	{
 		// no need to visit
 		return pgid;

@@ -5,6 +5,8 @@
 #include "stm.h"
 #include "pol.h"
 
+#include <boost/thread.hpp>
+
 // Transactional PageIO impl. using stm.h
 
 namespace ptnk
@@ -36,7 +38,11 @@ struct TPIOStat
 	{ /* NOP */ }
 
 	void merge(const TPIOStat& o);
+	void dump(std::ostream& o) const;
 };
+inline
+std::ostream& operator<<(std::ostream& s, const TPIOStat& o)
+{ o.dump(s); return s; }
 
 class TPIO2;
 
@@ -82,13 +88,13 @@ public:
 
 protected:
 	friend class TPIO2; // give access to c-tor
-	TPIO2TxSession(TPIO2* tpio, unique_ptr<LocalOvr>&& lovr);
+	TPIO2TxSession(TPIO2* tpio, shared_ptr<ActiveOvr> aovr, unique_ptr<LocalOvr> lovr);
 
 	PageIO* backend() const;
 
 	PagesOldLink* oldlink()
 	{
-		return &reinterpret_cast<OvrExtra*>(m_lovr->getExtra())->oldlink;
+		return m_oldlink;
 	};
 
 	void addOvr(page_id_t pgidOrig, page_id_t pgidOvr)
@@ -98,7 +104,6 @@ protected:
 
 	void loadStreak(BufferCRef bufStreak);
 
-private:
 	struct OvrExtra : public LocalOvr::ExtraData
 	{
 		~OvrExtra();
@@ -106,8 +111,11 @@ private:
 		PagesOldLink oldlink;
 	};
 
+private:
 	TPIO2* m_tpio;
+	shared_ptr<ActiveOvr> m_aovr;
 	unique_ptr<LocalOvr> m_lovr;
+	PagesOldLink* m_oldlink;
 	Vpage_id_t m_pagesModified;
 	TPIOStat m_stat;
 };
@@ -146,8 +154,8 @@ private:
 	class RebaseTPIO2TxSession : public TPIO2TxSession
 	{
 	public:
-		RebaseTPIO2TxSession(TPIO2* tpio, unique_ptr<LocalOvr>&& lovr, const PagesOldLink* oldlink);
-		~RebaseTPIOTxSession();
+		RebaseTPIO2TxSession(TPIO2* tpio, shared_ptr<ActiveOvr> aovr, unique_ptr<LocalOvr> lovr, PagesOldLink* oldlink);
+		~RebaseTPIO2TxSession();
 
 		page_id_t updateLink(page_id_t idOld);
 		page_id_t rebaseForceVisit(page_id_t pgid);
@@ -156,10 +164,11 @@ private:
 		page_id_t rebaseVisit(page_id_t pgid);
 
 		Spage_id_t m_visited;
-		const PagesOldLink* m_oldlink;
-	}
+		const PagesOldLink* m_oldlinkRebase;
+	};
 
 	void syncDelayed(const Vpage_id_t& pagesModified);
+	void commitTxPages(TPIO2TxSession* tx, ver_t verW, bool isRebase);
 
 	void restoreState();
 
@@ -173,7 +182,7 @@ private:
 	bool m_bDuringRebase;
 
 	boost::mutex m_mtxRebase;
-	boost::condition m_condRebase;
+	boost::condition_variable m_condRebase;
 };
 inline
 std::ostream& operator<<(std::ostream& s, const TPIO2& o)

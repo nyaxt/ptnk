@@ -66,6 +66,8 @@ public:
 	pair<page_id_t, ovr_status_t> searchOvr(page_id_t pgid);
 	void addOvr(page_id_t pgidOrig, page_id_t pgidOvr);
 
+	// ====== accessor methods ======
+	
 	class ExtraData
 	{
 	public:
@@ -79,6 +81,12 @@ public:
 
 	page_id_t pgidStartPage() const { return m_pgidStartPage; }
 	void setPgidStartPage(page_id_t pgid) { m_pgidStartPage = pgid; }
+
+	ver_t verRead() const { return m_verRead; }
+
+	LocalOvr* prev() const { return m_prev; }
+
+	bool isMerged() const { return m_merged; }
 
 private:
 	enum { TAG_TXVER_LOCAL = 0 };
@@ -105,6 +113,9 @@ private:
 	bool m_merged;
 
 	unique_ptr<ExtraData> m_extra;
+
+	bool m_bTerminator;
+	void setTerminator() { m_bTerminator = true; }
 };
 
 inline
@@ -117,8 +128,22 @@ public:
 	ActiveOvr(page_id_t pgidStartPage = PGID_INVALID, ver_t verBase = 1);
 	~ActiveOvr();
 
+	//! create new read snapshot as LocalOvr obj.
 	unique_ptr<LocalOvr> newTx();
+
+	//! try committing changes from _lovr_
+	/*!
+	 *	@param [in] verW
+	 *		If specified, force tx version number
+	 *		This must be larger than version number of previous commit.
+	 *
+	 *	@return
+	 *		version number of committed tx
+	 */
 	ver_t tryCommit(unique_ptr<LocalOvr>& lovr, ver_t verW = TXID_INVALID);
+
+	//! prevent further tx from committing
+	void terminate();
 
 	void dump(std::ostream& s) const;
 
@@ -129,8 +154,11 @@ public:
 		return m_verBase;
 	}
 
+	LocalOvr* lovrVerifiedTip() { return m_lovrVerifiedTip; }
+
 private:
 	void merge(LocalOvr* lovr);
+	void mergeUpto(LocalOvr* lovrTip);
 
 	OvrEntry* m_hashOvrs[TPIO_NHASH];
 

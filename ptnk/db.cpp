@@ -29,7 +29,7 @@ DB::DB(const char* filename, ptnk_opts_t opts, int mode)
 	initCommon();
 }
 
-DB::DB(const boost::shared_ptr<PageIO>& pio)
+DB::DB(const shared_ptr<PageIO>& pio)
 {
 	m_pio = pio;
 	initCommon();

@@ -5,20 +5,6 @@
 namespace ptnk
 {
 
-std::string
-pgid2str(page_id_t pgid)
-{
-	if(pgid == PGID_INVALID)
-	{
-		return "INVALID";
-	}
-
-	char buf[20];
-	sprintf(buf, "%x:%03llu", (unsigned int)PGID_PARTID(pgid), PGID_LOCALID(pgid));
-	
-	return buf;
-}
-
 void
 mod_info_t::dump() const
 {

@@ -22,7 +22,7 @@ class DB
 {
 public:
 	DB(const char* filename = NULL, ptnk_opts_t opts = ODEFAULT, int mode = 0644);
-	DB(const boost::shared_ptr<PageIO>& pio);
+	DB(const shared_ptr<PageIO>& pio);
 
 	void initCommon();
 
@@ -171,7 +171,7 @@ public:
 	}
 
 private:
-	boost::shared_ptr<PageIO> m_pio;
+	shared_ptr<PageIO> m_pio;
 	boost::scoped_ptr<TPIO2> m_tpio;
 };
 

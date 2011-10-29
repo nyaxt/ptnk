@@ -160,6 +160,7 @@ def build(bld):
 		ptnk/partitionedpageio.cpp
 		ptnk/btree.cpp
 		ptnk/compmap.cpp
+		ptnk/pol.cpp
 		ptnk/stm.cpp
 		ptnk/tpio.cpp
 		ptnk/tpio2.cpp

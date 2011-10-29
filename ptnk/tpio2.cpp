@@ -3,8 +3,8 @@
 
 #define TXSESSION_BATCH_SYNC
 // #define DEBUG_VERBOSE_TPIOPIO
-// #define DEBUG_VERBOSE_RESTORESTATE
-#define VERBOSE_REBASE
+#define DEBUG_VERBOSE_RESTORESTATE
+// #define VERBOSE_REBASE
 
 namespace ptnk
 {
@@ -25,25 +25,33 @@ TPIOStat::merge(const TPIOStat& o)
 	ADD(nNotifyOldLink)
 }
 
-TPIO2TxSession::TPIO2TxSession(TPIO2* tpio, unique_ptr<LocalOvr>&& lovr)
+void
+TPIOStat::dump(std::ostream& s) const
+{
+	s << "  nUniquePages:\t" << nUniquePages << std::endl;
+	s << "  nRead:\t" << nRead << std::endl;
+	s << "  nReadOvr:\t" << nReadOvr << std::endl;
+	s << "  nReadOvrL:\t" << nReadOvrLocal << std::endl;
+	s << "  nModifyPage:\t" << nModifyPage << std::endl;
+	s << "  nOvr:\t" << nOvr << std::endl;
+	s << "  nSync:\t" << nSync << std::endl;
+	s << "  nNotifyOldLink:\t" << nNotifyOldLink << std::endl;
+}
+
+TPIO2TxSession::TPIO2TxSession(TPIO2* tpio, shared_ptr<ActiveOvr> aovr, unique_ptr<LocalOvr> lovr)
 :	m_tpio(tpio),
+	m_aovr(move(aovr)),
 	m_lovr(move(lovr))
 {
 	m_lovr->attachExtra(unique_ptr<OvrExtra>(new OvrExtra));
+	m_oldlink = &reinterpret_cast<OvrExtra*>(m_lovr->getExtra())->oldlink;
 }
 
 void
 TPIO2TxSession::dump(std::ostream& s) const
 {
 	s << "** TPIO2TxSession dump **" << std::endl;
-	s << "  nUniquePages:\t" << m_stat.nUniquePages << std::endl;
-	s << "  nRead:\t" << m_stat.nRead << std::endl;
-	s << "  nReadOvr:\t" << m_stat.nReadOvr << std::endl;
-	s << "  nReadOvrL:\t" << m_stat.nReadOvrLocal << std::endl;
-	s << "  nModifyPage:\t" << m_stat.nModifyPage << std::endl;
-	s << "  nOvr:\t" << m_stat.nOvr << std::endl;
-	s << "  nSync:\t" << m_stat.nSync << std::endl;
-	s << "  nNotifyOldLink:\t" << m_stat.nNotifyOldLink << std::endl;
+	s << m_stat;
 }
 
 TPIO2TxSession::OvrExtra::~OvrExtra()
@@ -74,7 +82,7 @@ TPIO2TxSession::readPage(page_id_t pgid)
 	page_id_t pgidOvr; ovr_status_t st;
 	tie(pgidOvr, st) = m_lovr->searchOvr(pgid);
 #ifdef DEBUG_VERBOSE_TPIOPIO
-	// std::cout << "readPage " << pgid2str(pgid) << " -> " << pgid2str(pgidOvr) << " st: " << st << std::endl;
+	std::cout << "readPage " << pgid2str(pgid) << " -> " << pgid2str(pgidOvr) << " st: " << st << std::endl;
 #endif
 
 	Page pg = backend()->readPage(pgidOvr);
@@ -190,7 +198,7 @@ TPIO2TxSession::loadStreak(BufferCRef bufStreak)
 	oldlink()->restore(bufStreak);
 }
 
-TPIO2::TPIO2(boost::shared_ptr<PageIO> backend)
+TPIO2::TPIO2(shared_ptr<PageIO> backend)
 :	m_backend(backend),
 	m_bDuringRebase(false)
 {
@@ -221,11 +229,11 @@ TPIO2::newTransaction()
 		PTNK_MEMBARRIER_COMPILER;
 		if(m_bDuringRebase)
 		{
-			m_condRebase.wait(m_mtxRebase);
+			m_condRebase.wait(g);
 		}
 	}
 
-	return unique_ptr<TPIO2TxSession>(new TPIO2TxSession(this, m_aovr->newTx()));
+	return unique_ptr<TPIO2TxSession>(new TPIO2TxSession(this, m_aovr, m_aovr->newTx()));
 }
 
 void
@@ -262,6 +270,47 @@ TPIO2::syncDelayed(const Vpage_id_t& pagesModified)
 #endif
 }
 
+void
+TPIO2::commitTxPages(TPIO2TxSession* tx, ver_t verW, bool isRebase)
+{
+	// sort modified pages ary
+	Vpage_id_t& pagesModified = tx->m_pagesModified;
+	std::sort(pagesModified.begin(), pagesModified.end());
+
+	// write streaks
+	{
+		StreakIO<Vpage_id_t::const_iterator> sio(pagesModified.begin(), pagesModified.end(), backend());
+		sio.write(BufferCRef(&m_stat.nUniquePages, sizeof(uint64_t)));
+		tx->oldlink()->dump(sio);
+	}
+
+	// fill tpio header
+	// NOTE: this assumes mmap-ed pageio impl
+	{
+		for(page_id_t pgid: pagesModified)
+		{
+			Page pgLast(m_backend->readPage(pgid));
+
+			pgLast.hdr()->txid = verW;
+			pgLast.hdr()->flags = page_hdr_t::PF_VALID;
+		}
+
+		// last page of tx w/ special flag
+		{
+			page_id_t pgidLast = pagesModified.back();
+			Page pgLast(m_backend->readPage(pgidLast));
+
+			page_hdr_t::flags_t flags = page_hdr_t::PF_VALID | page_hdr_t::PF_END_TX;
+			if(isRebase) flags |= page_hdr_t::PF_TX_REBASE;
+
+			pgLast.hdr()->flags = flags;
+		}
+	}
+
+	// write pages to disk
+	syncDelayed(pagesModified);
+}
+
 bool
 TPIO2::tryCommit(TPIO2TxSession* tx, ver_t verW)
 {
@@ -271,8 +320,13 @@ TPIO2::tryCommit(TPIO2TxSession* tx, ver_t verW)
 		return true;
 	}
 
+	if(tx->m_aovr.get() != m_aovr.get())
+	{
+		// the aovr is no longer active (this tx is crossing rebase)
+		return false;
+	}
+
 	// 1. try committing ovr info
-	PagesOldLink* oldlink = tx->oldlink(); // capture this here as tryCommit below would blow away tx->m_lovr used in retrieval
 	if((verW = m_aovr->tryCommit(tx->m_lovr, verW)) == TXID_INVALID)
 	{
 		return false;
@@ -284,41 +338,7 @@ TPIO2::tryCommit(TPIO2TxSession* tx, ver_t verW)
 	m_stat.merge(tx->m_stat);
 
 	// 3. fill pages info / write pages to disk
-	
-	// - sort modified pages ary
-	Vpage_id_t& pagesModified = tx->m_pagesModified;
-	std::sort(pagesModified.begin(), pagesModified.end());
-
-	// - write streaks
-	{
-		StreakIO<Vpage_id_t::const_iterator> sio(pagesModified.begin(), pagesModified.end(), backend());
-		sio.write(BufferCRef(&m_stat.nUniquePages, sizeof(uint64_t)));
-		oldlink->dump(sio);
-	}
-
-	// - fill tpio header
-	// NOTE: this assumes mmap-ed pageio impl
-	{
-		for(page_id_t pgid: pagesModified)
-		{
-			Page pgLast(m_backend->readPage(pgid));
-
-			pgLast.hdr()->txid = verW;
-			pgLast.hdr()->flags = page_hdr_t::PF_VALID;
-		}
-
-		page_id_t pgidLast = pagesModified.back();
-
-		Page pgLast(m_backend->readPage(pgidLast));
-
-		page_hdr_t::flags_t flags = page_hdr_t::PF_VALID | page_hdr_t::PF_END_TX;
-		//FIXME if(m_type == SESSION_REBASE) flags |= page_hdr_t::PF_TX_REBASE;
-
-		pgLast.hdr()->flags = flags;
-	}
-
-	// - write pages to disk
-	syncDelayed(pagesModified);
+	commitTxPages(tx, verW, false);
 
 	return true;
 }
@@ -370,10 +390,18 @@ TPIO2::restoreState()
 		// skip invalid page
 		if(! pg.isCommitted()) continue;
 
+#ifdef DEBUG_VERBOSE_RESTORESTATE
+		std::cout << "ver: " << ver << " scan valid pg: " << pgid2str(pgid) << std::endl;
+#endif
+
 		if(pgidStartPage == PGID_INVALID && pg.pageType() == PT_DB_OVERVIEW)
 		{
 			// start page found.
 			pgidStartPage = pgid;
+
+#ifdef DEBUG_VERBOSE_RESTORESTATE
+		    std::cout << "- " << pgid2str(pgidStartPage) << " as startpg" << std::endl;
+#endif
 		}
 
 		if((flags & page_hdr_t::PF_END_TX) && (flags & page_hdr_t::PF_TX_REBASE))
@@ -383,6 +411,10 @@ TPIO2::restoreState()
 
 			// FIXME: This code assumes that no concurrent tx cross rebase tx pages
 			//        However, this may not be the case in future.
+
+#ifdef DEBUG_VERBOSE_RESTORESTATE
+		    std::cout << "- as rebase tx" << std::endl;
+#endif
 		}
 		
 		pagevers.push_back((PageVer){pgid, ver});
@@ -390,16 +422,16 @@ TPIO2::restoreState()
 		if(ver < verBase && pgidStartPage != PGID_INVALID)
 		{
 			// all the scanning jobs done. quit back scan
-
-			break;
+			goto SCANDONE;
 		}
 	}
+	SCANDONE:;
 	if(pgidStartPage == PGID_INVALID)
 	{
 		PTNK_THROW_RUNTIME_ERR("TPIO::restoreState: could not find start page");	
 	}
 #ifdef DEBUG_VERBOSE_RESTORESTATE
-	printf("restore phase1 end. pgidStartPage: %d, verBase: %d\n", pgidStartPage, verBase);
+	std::cout << "restore phase1 end. pgidStartPage: " << pgid2str(pgidStartPage) << " verBase: " << verBase << std::endl;
 #endif
 
 	// 2. sort the pages found while scan by its version
@@ -407,14 +439,16 @@ TPIO2::restoreState()
 
 	// 3. for each pages found in the scan, sorted by its version,
 	//    add ovr entries and handle streak data per tx
-	m_aovr = unique_ptr<ActiveOvr>(new ActiveOvr(pgidStartPage, verBase));
+	m_aovr = shared_ptr<ActiveOvr>(new ActiveOvr(pgidStartPage, verBase));
 	unique_ptr<TPIO2TxSession> tx = newTransaction();
-	tx_id_t verCurrent = pagevers.back().ver;
+	tx_id_t verCurrent = verBase;
 	Buffer bufStreak; bufStreak.reset();
 
 	VPageVer::const_reverse_iterator it = pagevers.rbegin(), itE = pagevers.rend();
 	for(; it != itE; ++ it)
 	{
+		if(it->ver < verBase) continue;
+
 		if(it->ver != verCurrent)
 		{
 			// new tx begins...
@@ -427,7 +461,10 @@ TPIO2::restoreState()
 			bufStreak.reset();
 
 			// -- ovr entries
-			PTNK_CHECK(verCurrent == m_aovr->tryCommit(tx->m_lovr, verCurrent));
+			if(verCurrent != verBase)
+			{
+				PTNK_CHECK(verCurrent == m_aovr->tryCommit(tx->m_lovr, verCurrent));
+			}
 			tx = newTransaction();
 
 			verCurrent = it->ver;
@@ -435,7 +472,7 @@ TPIO2::restoreState()
 
 		Page pg(m_backend->readPage(it->pgid));
 #ifdef DEBUG_VERBOSE_RESTORESTATE
-		std::cout << "ver: " << it->ver << " pgid: " << it->pgid << std::endl;
+		std::cout << "ver: " << it->ver << " pgid: " << pgid2str(it->pgid) << std::endl;
 #endif
 	
 		// -- ovr entries
@@ -469,30 +506,34 @@ TPIO2::restoreState()
 	printf("replay tx %d (last one)\n", verCurrent);
 #endif
 	tx->loadStreak(bufStreak.rref());
-	PTNK_CHECK(verCurrent == m_aovr->tryCommit(tx->m_lovr, verCurrent));
+	m_stat.nUniquePages = tx->m_stat.nUniquePages; // FIXME
+	if(verCurrent != verBase)
+	{
+		PTNK_CHECK(verCurrent == m_aovr->tryCommit(tx->m_lovr, verCurrent));
+	}
 }
 
-TPIO2::RebaseTPIO2TxSession::RebaseTPIO2TxSession(TPIO2* tpio, unique_ptr<LocalOvr>&& lovr, PagesOldLink* oldlink)
-:	TPIO2TxSession(tpio, lovr),
-	m_oldlink(oldlink)
+TPIO2::RebaseTPIO2TxSession::RebaseTPIO2TxSession(TPIO2* tpio, shared_ptr<ActiveOvr> aovr, unique_ptr<LocalOvr> lovr, PagesOldLink* oldlink)
+:	TPIO2TxSession(tpio, move(aovr), move(lovr)),
+	m_oldlinkRebase(oldlink)
 {
 	/* NOP */
 }
 
-~TPIO2::RebaseTPIO2TxSession::RebaseTPIOTxSession()
+TPIO2::RebaseTPIO2TxSession::~RebaseTPIO2TxSession()
 {
 	/* NOP */
 }
 
 page_id_t
-TPIO2::RebaseTPIOTxSession::rebaseForceVisit(page_id_t pgid)
+TPIO2::RebaseTPIO2TxSession::rebaseForceVisit(page_id_t pgid)
 {
 	m_visited.insert(pgid);
-
-#ifdef VERBOSE_REBASE
-	std::cout << "update link for pgid: " << pgid << std::endl;
-#endif
 	
+#ifdef VERBOSE_REBASE
+	std::cout << "rebase visit pgid: " << pgid << std::endl;
+#endif
+
 	Page pg(readPage(pgid));
 
 	mod_info_t mod;
@@ -502,9 +543,9 @@ TPIO2::RebaseTPIOTxSession::rebaseForceVisit(page_id_t pgid)
 }
 
 page_id_t
-TPIO2::RebaseTPIOTxSession::rebaseVisit(page_id_t pgid)
+TPIO2::RebaseTPIO2TxSession::rebaseVisit(page_id_t pgid)
 {
-	if(! m_oldlink.contains(pgid))
+	if(! m_oldlinkRebase->contains(pgid))
 	{
 		// no need to visit
 		return pgid;
@@ -513,19 +554,29 @@ TPIO2::RebaseTPIOTxSession::rebaseVisit(page_id_t pgid)
 	if(m_visited.find(pgid) != m_visited.end())
 	{
 		// already visited
-		return pgid;	
+		return pgid;
 	}
 
 	return rebaseForceVisit(pgid);
 }
 
 page_id_t
-TPIO2::RebaseTPIOTxSession::updateLink(page_id_t idOld)
+TPIO2::RebaseTPIO2TxSession::updateLink(page_id_t idOld)
 {
-	page_id_t idR= rebaseVisit(idOld);
-	if(idR != idOld) return idR;
+	page_id_t idR = rebaseVisit(idOld);
+	if(idR != idOld)
+	{
+#ifdef VERBOSE_REBASE
+		std::cout << "updateLink: " << pgid2str(idOld) << " -> (rebase visited) " << pgid2str(idR) << std::endl;	
+#endif
+		return idR;
+	}
 
-	return m_lovr->searchOvr(idOld).first;
+	page_id_t idO = m_lovr->searchOvr(idOld).first;
+#ifdef VERBOSE_REBASE
+	std::cout << "updateLink: " << pgid2str(idOld) << " -> " << pgid2str(idO) << std::endl;	
+#endif
+	return idO;
 }
 
 void
@@ -535,37 +586,53 @@ TPIO2::rebase(bool force)
 
 	if(!force && m_stat.nOvr < REBASE_THRESHOLD) return; // num ovrs below threshold
 
-	m_bDuringRebase = true;
-
 #ifdef VERBOSE_REBASE
 	printf("rebase start\n");
+	std::cout << *this;
 #endif
-	for(;;)
+
+	// 1. refuse further tx to commit
+	m_bDuringRebase = true;
+	m_aovr->terminate();
+	
+	// 2. ready list of pages old link
+	PagesOldLink pol;
+	for(LocalOvr* o = m_aovr->lovrVerifiedTip(); o; o = o->prev())
 	{
-#ifdef VERBOSE_REBASE
-		printf("rebase tx start\n");
-#endif
-		PagesOldLink pol;
-		
-		unique_ptr<RebaseTPIO2TxSession> tx(new RebaseTPIOTxSession(this, m_aovr->newTx(), &pol));
-		
-		tx->setPgidStartPage(tx->rebaseForceVisit(tx->pgidStartPage()));
+		if(! o->isMerged()) continue; // skip terminator
 
-#ifdef VERBOSE_REBASE
-		std::cerr << *tx << std::endl;
-#endif
-		if(tx->tryRebaseCommit()) break;
-
-#ifdef VERBOSE_REBASE
-		std::cout << "rebase tx failed to commit" << std::endl;
-#endif
+		const PagesOldLink& opol = reinterpret_cast<TPIO2TxSession::OvrExtra*>(o->getExtra())->oldlink;
+		pol.merge(opol);
 	}
 #ifdef VERBOSE_REBASE
-	printf("rebase end verBase: %d", m_aovr->verBase());
+	std::cerr << pol << std::endl;
 #endif
+	
+	// 3. create rebsae tx. and start visit from root
+	unique_ptr<LocalOvr> lovr(m_aovr->newTx());
+	ver_t verBase = lovr->verRead() + 1;
+	unique_ptr<RebaseTPIO2TxSession> tx(new RebaseTPIO2TxSession(this, m_aovr, move(lovr), &pol));
+	
+	tx->setPgidStartPage(tx->rebaseForceVisit(tx->pgidStartPage()));
+
+#ifdef VERBOSE_REBASE
+	std::cerr << *tx << std::endl;
+#endif
+
+	// 4. commit rebase tx. pages
+	commitTxPages(tx.get(), verBase, true);
+	
+	// 5. trash old aovr and start accepting new tx
+	m_stat.nOvr = 0; // clear num ovr.
+	m_aovr = shared_ptr<ActiveOvr>(new ActiveOvr(tx->pgidStartPage(), verBase));
 
 	m_bDuringRebase = false;
 	m_condRebase.notify_all();
+	
+#ifdef VERBOSE_REBASE
+	printf("rebase end verBase: %d\n", m_aovr->verBase());
+	std::cout << *this;
+#endif
 }
 
 void
@@ -578,6 +645,7 @@ void
 TPIO2::dump(std::ostream& s) const
 {
 	s << "** TPIO dump **" << std::endl;
+	s << m_stat;
 }
 
 } // end of namespace ptnk
