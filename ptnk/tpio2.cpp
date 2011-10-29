@@ -3,7 +3,7 @@
 
 #define TXSESSION_BATCH_SYNC
 // #define DEBUG_VERBOSE_TPIOPIO
-#define DEBUG_VERBOSE_RESTORESTATE
+// #define DEBUG_VERBOSE_RESTORESTATE
 // #define VERBOSE_REBASE
 
 namespace ptnk
@@ -233,7 +233,9 @@ TPIO2::newTransaction()
 		}
 	}
 
-	return unique_ptr<TPIO2TxSession>(new TPIO2TxSession(this, m_aovr, m_aovr->newTx()));
+	shared_ptr<ActiveOvr> aovr = m_aovr;
+	unique_ptr<LocalOvr> lovr = aovr->newTx();
+	return unique_ptr<TPIO2TxSession>(new TPIO2TxSession(this, move(aovr), move(lovr)));
 }
 
 void
@@ -312,7 +314,7 @@ TPIO2::commitTxPages(TPIO2TxSession* tx, ver_t verW, bool isRebase)
 }
 
 bool
-TPIO2::tryCommit(TPIO2TxSession* tx, ver_t verW)
+TPIO2::tryCommit(TPIO2TxSession* tx)
 {
 	if(tx->m_pagesModified.empty())
 	{
@@ -320,14 +322,9 @@ TPIO2::tryCommit(TPIO2TxSession* tx, ver_t verW)
 		return true;
 	}
 
-	if(tx->m_aovr.get() != m_aovr.get())
-	{
-		// the aovr is no longer active (this tx is crossing rebase)
-		return false;
-	}
-
 	// 1. try committing ovr info
-	if((verW = m_aovr->tryCommit(tx->m_lovr, verW)) == TXID_INVALID)
+	ver_t verW;
+	if((verW = tx->m_aovr->tryCommit(tx->m_lovr)) == TXID_INVALID)
 	{
 		return false;
 	}
@@ -586,13 +583,14 @@ TPIO2::rebase(bool force)
 
 	if(!force && m_stat.nOvr < REBASE_THRESHOLD) return; // num ovrs below threshold
 
+	if(! __sync_bool_compare_and_swap(&m_bDuringRebase, false, true)) return;
+
 #ifdef VERBOSE_REBASE
 	printf("rebase start\n");
 	std::cout << *this;
 #endif
 
 	// 1. refuse further tx to commit
-	m_bDuringRebase = true;
 	m_aovr->terminate();
 	
 	// 2. ready list of pages old link
@@ -607,11 +605,18 @@ TPIO2::rebase(bool force)
 #ifdef VERBOSE_REBASE
 	std::cerr << pol << std::endl;
 #endif
-	
+
 	// 3. create rebsae tx. and start visit from root
-	unique_ptr<LocalOvr> lovr(m_aovr->newTx());
-	ver_t verBase = lovr->verRead() + 1;
-	unique_ptr<RebaseTPIO2TxSession> tx(new RebaseTPIO2TxSession(this, m_aovr, move(lovr), &pol));
+	ver_t verBase;
+	unique_ptr<RebaseTPIO2TxSession> tx;
+	{
+		shared_ptr<ActiveOvr> aovr = m_aovr;
+		unique_ptr<LocalOvr> lovr(aovr->newTx());
+		verBase = lovr->verRead() + 1;
+		// ver_t verB2 = m_aovr->lovrVerifiedTip()->prev()->verWrite() + 1;
+		// PTNK_CHECK(verBase == verB2);
+		tx.reset(new RebaseTPIO2TxSession(this, move(aovr), move(lovr), &pol));
+	}
 	
 	tx->setPgidStartPage(tx->rebaseForceVisit(tx->pgidStartPage()));
 
@@ -624,7 +629,10 @@ TPIO2::rebase(bool force)
 	
 	// 5. trash old aovr and start accepting new tx
 	m_stat.nOvr = 0; // clear num ovr.
+	// FIXME FIXME: shared_ptr can't be assigned atomically (refcnt / ptr)
 	m_aovr = shared_ptr<ActiveOvr>(new ActiveOvr(tx->pgidStartPage(), verBase));
+
+	PTNK_MEMBARRIER_COMPILER;
 
 	m_bDuringRebase = false;
 	m_condRebase.notify_all();

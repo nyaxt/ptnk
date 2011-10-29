@@ -83,6 +83,7 @@ public:
 	void setPgidStartPage(page_id_t pgid) { m_pgidStartPage = pgid; }
 
 	ver_t verRead() const { return m_verRead; }
+	ver_t verWrite() const { return m_verWrite; }
 
 	LocalOvr* prev() const { return m_prev; }
 

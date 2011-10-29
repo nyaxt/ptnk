@@ -103,9 +103,6 @@ LocalOvr::addOvr(page_id_t pgidOrig, page_id_t pgidOvr)
 bool
 LocalOvr::checkConflict(LocalOvr* other)
 {
-	// tx may not committed after terminator
-	if(other->m_bTerminator) return false;
-
 	if(other->m_pgidStartPage != m_pgidStartPageOrig) return false;
 	if(! other->m_bfOvrs.mayContain(m_bfOvrs)) return false;
 	
@@ -269,6 +266,8 @@ ActiveOvr::mergeUpto(LocalOvr* lovrTip)
 	std::vector<LocalOvr*> lovrsUnmerged;
 	for(LocalOvr* o = lovrTip; o && !o->isMerged(); o = o->m_prev)
 	{
+		if(o->m_bTerminator) continue;
+
 		lovrsUnmerged.push_back(o);
 	}
 
@@ -295,6 +294,10 @@ ActiveOvr::tryCommit(unique_ptr<LocalOvr>& plovr, ver_t verW)
 		for(;;)
 		{
 			LocalOvr* lovrPrev = m_lovrVerifiedTip;
+
+			// tx may not committed after terminator
+			if(lovrPrev && lovrPrev->m_bTerminator) return PGID_INVALID;
+
 			lovr->m_prev = lovrPrev;
 			lovr->m_verWrite = (lovrPrev ? lovrPrev->m_verWrite : m_verBase) + 1;
 			if(verW != TXID_INVALID)

@@ -135,7 +135,7 @@ public:
 	void dump(std::ostream& s) const;
 
 	unique_ptr<TPIO2TxSession> newTransaction();
-	bool tryCommit(TPIO2TxSession* tx, ver_t verW = TXID_INVALID);
+	bool tryCommit(TPIO2TxSession* tx);
 
 	void rebase(bool force);
 	void refreshOldPages(page_id_t threshold);

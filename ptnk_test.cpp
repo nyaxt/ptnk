@@ -3875,7 +3875,7 @@ struct put_ary_db
 	}
 };
 
-// #define DUMP_MTPUT
+#define DUMP_MTPUT
 
 TEST(ptnk, multithread_put)
 {
