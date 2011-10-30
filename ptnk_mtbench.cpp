@@ -23,6 +23,8 @@ void get_random_ord(int ord[], int size)
 #define SETUP_ORD(size) \
 	int ord[(size)]; get_random_ord(ord, (size));
 
+unsigned int g_confl = 0;
+
 struct put_ary_db
 {
 	DB& db;
@@ -50,6 +52,7 @@ struct put_ary_db
 				tx->put(BufferCRef(&k, 4), cstr2ref(buf));
 
 				if(tx->tryCommit()) break;
+				g_confl ++;
 			}
 		}
 	}
@@ -63,17 +66,17 @@ run_bench()
 		const int NUM_KEYS_PER_TH = NUM_KEYS / NUM_THREADS;
 		SETUP_ORD(NUM_KEYS);
 
-		ptnk_opts_t opts = OWRITER | OCREATE | OTRUNCATE;
+		ptnk_opts_t opts = OWRITER | OCREATE | OTRUNCATE | OPARTITIONED;
 		if(do_sync) opts |= OAUTOSYNC;
 		
 		DB db(dbfile, opts);
 		// DB db;
-		b.cp("db init");
+		// b.cp("db init");
+		b.start();
 
 		boost::thread_group tg;
 		for(int i = 0; i < NUM_THREADS; ++ i)
 		{
-			std::cout << "t";
 			tg.create_thread(put_ary_db(db, &ord[NUM_KEYS_PER_TH * i], NUM_KEYS_PER_TH));
 		}
 		tg.join_all();
@@ -84,4 +87,6 @@ run_bench()
 	b.dump();
 
 	MutexProf::dumpStatAll();
+	std::cout << "# confl: " << g_confl << std::endl;
+	std::cout << "# keys: " << NUM_KEYS << std::endl;
 }

@@ -12,6 +12,7 @@ from waflib import Build, Options, TaskGen, Task
 def options(opt):
 	opt.load('compiler_cxx boost gtest')
 
+	opt.add_option('--with-mtxprof', action='store_true', default=False, help='enable mutex profiling', dest='mtxprof')
 	opt.add_option('--with-dtrace', action='store_true', default=False, help='enable DTrace/SystemTap probes', dest='dtrace')
 
 def configure(conf):
@@ -26,6 +27,9 @@ def configure(conf):
 		conf.find_program('dtrace', var='DTRACE', mandatory=True)
 		conf.env["USE_DTRACE"] = True
 		conf.env.append_unique('DEFINES', ['HAVE_DTRACE'])
+
+	if Options.options.mtxprof:
+		conf.env.append_unique('DEFINES', ['PTNK_MUTEXPROF'])
 
 	# posix_fallocate exist?
 	conf.check_cc(fragment='''

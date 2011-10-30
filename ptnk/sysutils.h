@@ -12,10 +12,11 @@
 
 #ifndef NSEC_PER_SEC
 # define NSEC_PER_SEC                   1000000000ULL
+# define NSEC_PER_MSEC                  1000000ULL
 # define NSEC_PER_USEC                  1000ULL
 #endif
 
-#define PTNK_MUTEXPROF
+// #define PTNK_MUTEXPROF
 
 namespace ptnk
 {

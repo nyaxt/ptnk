@@ -18,16 +18,25 @@ namespace ptnk
 std::vector<MutexProf*> MutexProf::s_profs;
 
 MutexProf::MutexProf(const char* strid)
-:	m_strid(strid),
-	m_totalWaitLock(0)
+:	m_totalWaitLock(0)
 {
+	while(*strid == '.' || *strid == '/') strid++;
+	m_strid = strid;
+
 	s_profs.push_back(this);	
 }
 
 void
 MutexProf::dumpStat()
 {
-	std::cerr << m_strid << ":\t" << m_totalWaitLock/NSEC_PER_USEC << "us" << std::endl;
+	if(m_totalWaitLock < NSEC_PER_MSEC)
+	{
+		std::cerr << m_strid << ":\t" << m_totalWaitLock/NSEC_PER_USEC << "us" << std::endl;
+	}
+	else
+	{
+		std::cerr << m_strid << ":\t" << m_totalWaitLock/NSEC_PER_MSEC << "ms" << std::endl;
+	}
 }
 
 void

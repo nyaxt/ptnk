@@ -13,7 +13,7 @@ namespace ptnk
 
 typedef tx_id_t ver_t;
 
-enum { TPIO_NHASH = 64 };
+enum { TPIO_NHASH = 128 };
 
 struct OvrEntry
 {

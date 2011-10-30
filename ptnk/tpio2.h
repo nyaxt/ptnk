@@ -123,7 +123,7 @@ inline
 std::ostream& operator<<(std::ostream& s, const TPIO2TxSession& o)
 { o.dump(s); return s; }
 
-constexpr unsigned int REBASE_THRESHOLD = TPIO_NHASH * 16;
+constexpr unsigned int REBASE_THRESHOLD = TPIO_NHASH * 8;
 
 class TPIO2
 {

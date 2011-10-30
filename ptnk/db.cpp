@@ -444,7 +444,7 @@ DB::Tx::dumpStat() const
 void
 DB::rebase(bool force)
 {
-	m_pio->newPart(false /* no force */);
+	// m_pio->newPart(false /* no force */);
 	m_tpio->rebase(force);
 }
 

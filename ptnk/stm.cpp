@@ -1,5 +1,6 @@
 #include "stm.h"
 #include "exceptions.h"
+#include "sysutils.h"
 
 namespace ptnk
 {
@@ -221,11 +222,13 @@ ActiveOvr::merge(LocalOvr* lovr)
 	// FIXME: really implement the concurrent merge
 	if(! __sync_bool_compare_and_swap(&lovr->m_mergeOngoing, false, true))
 	{
+		MUTEXPROF_START("wait merge");
 		// wait until merge complete
 		while(! lovr->isMerged())
 		{
 			PTNK_MEMBARRIER_COMPILER;
 		}
+		MUTEXPROF_END;
 
 		return;
 	}

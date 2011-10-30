@@ -1,5 +1,6 @@
 #include "tpio2.h"
 #include "streak.h"
+#include "sysutils.h"
 
 #define TXSESSION_BATCH_SYNC
 // #define DEBUG_VERBOSE_TPIOPIO
@@ -79,11 +80,13 @@ TPIO2TxSession::readPage(page_id_t pgid)
 {
 	++ m_stat.nRead;
 
+	MUTEXPROF_START("resolveOvr");
 	page_id_t pgidOvr; ovr_status_t st;
 	tie(pgidOvr, st) = m_lovr->searchOvr(pgid);
 #ifdef DEBUG_VERBOSE_TPIOPIO
 	std::cout << "readPage " << pgid2str(pgid) << " -> " << pgid2str(pgidOvr) << " st: " << st << std::endl;
 #endif
+	MUTEXPROF_END;
 
 	Page pg = backend()->readPage(pgidOvr);
 	if(st != OVR_NONE)
@@ -125,7 +128,9 @@ TPIO2TxSession::modifyPage(const Page& page, mod_info_t* mod)
 		tie(ovr, mod->idOvr) = newPage();
 		-- m_stat.nUniquePages;
 
+		MUTEXPROF_START("makePageOvr");
 		ovr.makePageOvr(page, mod->idOvr);
+		MUTEXPROF_END;
 
 		addOvr(mod->idOrig, mod->idOvr);
 		
@@ -224,6 +229,7 @@ TPIO2::newTransaction()
 	// wait while rebase is processed
 	while(m_bDuringRebase)
 	{
+		MUTEXPROF_START("waitrebase");
 		boost::unique_lock<boost::mutex> g(m_mtxRebase);
 
 		PTNK_MEMBARRIER_COMPILER;
@@ -231,6 +237,7 @@ TPIO2::newTransaction()
 		{
 			m_condRebase.wait(g);
 		}
+		MUTEXPROF_END;
 	}
 
 	shared_ptr<ActiveOvr> aovr = m_aovr;
@@ -324,9 +331,13 @@ TPIO2::tryCommit(TPIO2TxSession* tx)
 
 	// 1. try committing ovr info
 	ver_t verW;
-	if((verW = tx->m_aovr->tryCommit(tx->m_lovr)) == TXID_INVALID)
 	{
-		return false;
+		MUTEXPROF_START("aovr tryCommit");
+		if((verW = tx->m_aovr->tryCommit(tx->m_lovr)) == TXID_INVALID)
+		{
+			return false;
+		}
+		MUTEXPROF_END;
 	}
 
 	// ovr info committed! now tx is guaranteed to be valid...
@@ -595,12 +606,16 @@ TPIO2::rebase(bool force)
 	
 	// 2. ready list of pages old link
 	PagesOldLink pol;
-	for(LocalOvr* o = m_aovr->lovrVerifiedTip(); o; o = o->prev())
 	{
-		if(! o->isMerged()) continue; // skip terminator
+		MUTEXPROF_START("rebase:pol");
+		for(LocalOvr* o = m_aovr->lovrVerifiedTip(); o; o = o->prev())
+		{
+			if(! o->isMerged()) continue; // skip terminator
 
-		const PagesOldLink& opol = reinterpret_cast<TPIO2TxSession::OvrExtra*>(o->getExtra())->oldlink;
-		pol.merge(opol);
+			const PagesOldLink& opol = reinterpret_cast<TPIO2TxSession::OvrExtra*>(o->getExtra())->oldlink;
+			pol.merge(opol);
+		}
+		MUTEXPROF_END;
 	}
 #ifdef VERBOSE_REBASE
 	std::cerr << pol << std::endl;
@@ -618,7 +633,11 @@ TPIO2::rebase(bool force)
 		tx.reset(new RebaseTPIO2TxSession(this, move(aovr), move(lovr), &pol));
 	}
 	
-	tx->setPgidStartPage(tx->rebaseForceVisit(tx->pgidStartPage()));
+	{
+		MUTEXPROF_START("rebase:visit");
+		tx->setPgidStartPage(tx->rebaseForceVisit(tx->pgidStartPage()));
+		MUTEXPROF_END;
+	}
 
 #ifdef VERBOSE_REBASE
 	std::cerr << *tx << std::endl;

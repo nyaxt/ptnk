@@ -40,7 +40,7 @@ MappedFile::createNew(part_id_t partid, const char* filename, ptnk_opts_t opts, 
 	}
 	
 	std::auto_ptr<MappedFile> mf(new MappedFile(partid, filename, fd, PROT_READ | PROT_WRITE));
-	mf->expandFile(1024);
+	mf->expandFile(1024 * 1024);
 
 	return mf.release();
 }
@@ -118,6 +118,7 @@ MappedFile::getmLast()
 void
 MappedFile::moreMMap(size_t pgs)
 {
+	MUTEXPROF_START("moreMMap");
 	Mapping* mLast = getmLast();
 
 	char* mapstart;
@@ -161,6 +162,7 @@ MappedFile::moreMMap(size_t pgs)
 		
 		mLast->next = mNew; // move semantics
 	}
+	MUTEXPROF_END;
 }
 
 void
@@ -171,6 +173,7 @@ MappedFile::expandFile(size_t pgs)
 	// expand file size
 	if(isFile())
 	{
+		MUTEXPROF_START("fallocate");
 		size_t allocsize = pgs * PTNK_PAGE_SIZE;
 	#ifdef USE_POSIX_FALLOCATE
 		int ret;
@@ -184,6 +187,7 @@ MappedFile::expandFile(size_t pgs)
 		PTNK_ASSURE_SYSCALL(::pwrite(m_fd, buf.get(), allocsize, m_numPagesReserved * PTNK_PAGE_SIZE));
 		PTNK_ASSURE_SYSCALL(::fsync(m_fd));
 	#endif
+		MUTEXPROF_END;
 	}
 
 	// mmap expanded region
@@ -494,7 +498,7 @@ RETRY:
 #endif
 		boost::unique_lock<boost::mutex> g(m_mtxAlloc);
 
-		if(m_pgidLNext >= 128 * 1024 * 1024 / PTNK_PAGE_SIZE)
+		if(0) //if(m_pgidLNext >= 128 * 1024 * 1024 / PTNK_PAGE_SIZE)
 		{
 			addNewPartition_unsafe();
 			m_pgidLNext = 0;
