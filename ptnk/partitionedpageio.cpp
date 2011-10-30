@@ -173,7 +173,11 @@ MappedFile::expandFile(size_t pgs)
 	{
 		size_t allocsize = pgs * PTNK_PAGE_SIZE;
 	#ifdef USE_POSIX_FALLOCATE
-		PTNK_ASSURE_SYSCALL(::posix_fallocate(m_fd, m_numPagesReserved * PTNK_PAGE_SIZE, allocsize));
+		int ret;
+		if(0 != (ret = ::posix_fallocate(m_fd, m_numPagesReserved * PTNK_PAGE_SIZE, allocsize)))
+		{
+			throw ptnk_syscall_error(__FILE__, __LINE__, "posix_fallocate", ret);
+		}
 	#else
 		// expand file first
 		boost::scoped_ptr<char> buf(new char[allocsize + PTNK_PAGE_SIZE]);
