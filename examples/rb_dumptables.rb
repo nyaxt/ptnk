@@ -15,4 +15,4 @@ tx.table_get_names.each do |tn|
   end
 end
 
-tx.abort
+tx.abort!

@@ -202,6 +202,8 @@ def build(bld):
 			source = 'ptnk_test.cpp'
 			)
 
+	# bench utils
+	# if bld.variant == 'rel':
 	bld.program(
 		target = 'ptnk_bench',
 
@@ -209,15 +211,12 @@ def build(bld):
 		source = 'ptnk_bench.cpp'
 		)
 
-
-	# bench utils
-	if bld.variant == 'rel':
-		bld.program(
-			target = 'ptnk_mtbench',
-			
-			use = 'TCMALLOC PTHREAD BOOST ptnk',
-			source = 'ptnk_mtbench.cpp'
-			)
+	bld.program(
+		target = 'ptnk_mtbench',
+		
+		use = 'TCMALLOC PTHREAD BOOST ptnk',
+		source = 'ptnk_mtbench.cpp'
+		)
 
 	# debug utils
 	bld.program(
