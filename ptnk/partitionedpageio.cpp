@@ -21,9 +21,13 @@
 namespace ptnk
 {
 
+constexpr size_t NUM_PAGES_ALLOC_ONCE = 256;
+
 constexpr unsigned long PARTSIZEFILE_MAX = 1024 * 1024 * 1024; // 1GB
+constexpr long NPAGES_PARTMAX = PARTSIZEFILE_MAX/PTNK_PAGE_SIZE;
 constexpr unsigned long PARTSIZEFILE_MIN = 128 * 1024 * 1024; // 128MB
-constexpr unsigned long PARTSIZEFILE_STARTALLOC = 32 * 1024 * 1024; // 128MB
+constexpr unsigned long PARTSIZEFILE_PREALLOC = 32 * 1024 * 1024; // 128MB
+constexpr long NPAGES_PREALLOC = PARTSIZEFILE_PREALLOC/PTNK_PAGE_SIZE;
 
 MappedFile*
 MappedFile::createNew(part_id_t partid, const char* filename, ptnk_opts_t opts, int mode)
@@ -169,11 +173,20 @@ MappedFile::moreMMap(size_t pgs)
 	}
 	MUTEXPROF_END;
 }
+#define VERBOSE_PAGEIO
 
 void
 MappedFile::expandFile(size_t pgs)
 {
+	#ifdef VERBOSE_PAGEIO
+	std::cout << "expandFile " << pgs << " pgs -> ";
+	#endif
 	if(pgs < NUM_PAGES_ALLOC_ONCE) pgs = NUM_PAGES_ALLOC_ONCE;
+	if(pgs + m_numPagesReserved > (long)NPAGES_PARTMAX) pgs = NPAGES_PARTMAX - m_numPagesReserved;
+	#ifdef VERBOSE_PAGEIO
+	std::cout << pgs << " pgs" << std::endl;
+	#endif
+	if(pgs == 0) return;
 
 	// expand file size
 	if(isFile())
@@ -306,6 +319,16 @@ PartitionedPageIO::PartitionedPageIO(const char* dbprefix, ptnk_opts_t opts, int
 			m_needInit = false;	
 		}
 	}
+}
+
+void
+PartitionedPageIO::attachHelper(Helper* helper)
+{
+	PTNK_CHECK(! m_helper);
+	PTNK_CHECK(helper);
+
+	m_helper = helper;
+	m_isHelperInvoked = false;
 }
 
 PartitionedPageIO::~PartitionedPageIO()
@@ -517,7 +540,7 @@ PartitionedPageIO::expandTo(page_id_t pgid)
 	ssize_t numNeeded = pgid - PGID_PARTLOCAL(m_active->partid(), m_active->numPagesReserved()) + 1;
 	if(numNeeded <= 0) return;
 
-	if(PGID_LOCALID(m_pgidNext) >= PARTSIZEFILE_MAX / PTNK_PAGE_SIZE)
+	if(PGID_LOCALID(m_pgidNext) >= NPAGES_PARTMAX)
 	{
 		// need new partition
 
@@ -547,20 +570,24 @@ PartitionedPageIO::newPage()
 		ssize_t numNeeded = pgid - PGID_PARTLOCAL(m_active->partid(), m_active->numPagesReserved()) + 1;
 
 		// preallocate helper
-	#if 0
-		if(!m_isHelperInvoked && numNeeded > - PARTSIZEFILE_STARTALLOC/PTNK_PAGE_SIZE)
+		if(!m_isHelperInvoked && numNeeded > -NPAGES_PREALLOC)
 		{
 			// make helper pre-allocate pages
 			if(__sync_bool_compare_and_swap(&m_isHelperInvoked, false, true))
 			{
-				m_helper->enq([this]() {
-					
+				m_helper->enq([this, pgid]() {
+				#ifdef VERBOSE_PAGEIO
+					std::cout << "pre alloc to " << pgid2str(pgid+NPAGES_PREALLOC) << std::endl;
+				#endif
+					expandTo(pgid + NPAGES_PREALLOC);
+				#ifdef VERBOSE_PAGEIO
+					std::cout << "pre alloc done" << std::endl;
+				#endif
 
 					m_isHelperInvoked = false;	
 				});
 			}
 		}
-	#endif
 
 		if(pgid == PGID_INVALID || numNeeded > 0)
 		{
@@ -575,7 +602,7 @@ PartitionedPageIO::newPage()
 	}
 	while(! __sync_bool_compare_and_swap(&m_pgidNext, pgid, pgid+1));
 
-	return make_pair(Page(m_active->calcPtr(PGID_LOCALID(pgid)), true), pgid);
+	return make_pair(Page(m_parts[PGID_PARTID(pgid)].calcPtr(PGID_LOCALID(pgid)), true), pgid);
 }
 
 Page

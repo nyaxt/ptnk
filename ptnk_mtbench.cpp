@@ -66,7 +66,7 @@ run_bench()
 		const int NUM_KEYS_PER_TH = NUM_KEYS / NUM_THREADS;
 		SETUP_ORD(NUM_KEYS);
 
-		ptnk_opts_t opts = OWRITER | OCREATE | OTRUNCATE | OPARTITIONED;
+		ptnk_opts_t opts = OWRITER | OCREATE | OTRUNCATE | OPARTITIONED | OHELPERTHREAD;
 		if(do_sync) opts |= OAUTOSYNC;
 		
 		DB db(dbfile, opts);

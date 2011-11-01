@@ -123,7 +123,7 @@ public:
 	 *		ex. "/db/file/path/dbname"
 	 */
 	PartitionedPageIO(const char* dbprefix, ptnk_opts_t opts, int mode = 0644);
-	void attachHelper(Helper* helper) { m_helper = helper; }
+	void attachHelper(Helper* helper);
 
 	~PartitionedPageIO();
 
