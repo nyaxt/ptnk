@@ -16,10 +16,10 @@
 # define NSEC_PER_USEC                  1000ULL
 #endif
 
-// #define PTNK_MUTEXPROF
-
 namespace ptnk
 {
+
+#define PTNK_MEMBARRIER_COMPILER asm volatile("": : :"memory"); 
 
 #define PTNK_STRINGIFY(x) PTNK_STRINGIFY2(x)
 #define PTNK_STRINGIFY2(x) #x

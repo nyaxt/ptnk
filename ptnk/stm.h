@@ -9,8 +9,6 @@
 namespace ptnk
 {
 
-#define PTNK_MEMBARRIER_COMPILER asm volatile("": : :"memory"); 
-
 typedef tx_id_t ver_t;
 
 enum { TPIO_NHASH = 128 };

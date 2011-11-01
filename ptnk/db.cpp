@@ -28,7 +28,7 @@ DB::DB(const char* filename, ptnk_opts_t opts, int mode)
 		PartitionedPageIO* ppio;
 		m_pio.reset((ppio = new PartitionedPageIO(filename, opts, mode)));
 
-		ppio->attachHelper(m_helper.get());
+		if(m_helper) ppio->attachHelper(m_helper.get());
 	}
 	else
 	{

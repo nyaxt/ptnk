@@ -13,21 +13,21 @@ namespace ptnk
 class MappedFile
 {
 public:
-	enum
-	{
-		NUM_PAGES_ALLOC_ONCE = 256,
-	};
-
 	static MappedFile* openExisting(part_id_t partid, const char* filename, ptnk_opts_t opts);
 	static MappedFile* createNew(part_id_t partid, const char* filename, ptnk_opts_t opts, int mode);
 	~MappedFile();
 
-	page_id_t alloc();
 	char* calcPtr(local_pgid_t pgid);
 	void sync(local_pgid_t pgidStart, local_pgid_t pgidEnd);
 
-	//! expand file size and mapped region
-	void expandFile(size_t pgs);
+	bool isReadOnly() const { return m_isReadOnly; }
+	void makeReadOnly();
+
+	//! alloc more pages by expanding filesize and mapped region
+	/*!
+	 *	@return number of actually alloced pages (0 if none alloced)
+	 */
+	size_t expandFile(size_t pgs);
 
 	size_t numPagesReserved() const
 	{
@@ -86,6 +86,9 @@ private:
 	//! prot passed to mmap(2)
 	int m_prot;
 
+	//! true if this part is mmap-ed read-only
+	bool m_isReadOnly;
+
 	//! first mmap-ed region
 	Mapping m_mapFirst;
 
@@ -109,6 +112,7 @@ MappedFile::calcPtr(local_pgid_t pgid)
 		}
 	}
 
+	PTNK_CHECK(false);
 	return NULL;
 }
 
@@ -164,7 +168,11 @@ public:
 
 private:
 	//! open partitioned db files and populate m_parts
-	void openFiles();
+	/*!
+	 *	@return
+	 *		MappedFile instance carrying latest partition file
+	 */
+	MappedFile* openFiles();
 
 	//! add new partition
 	/*!
@@ -172,7 +180,7 @@ private:
 	 */
 	MappedFile* addNewPartition_unsafe();
 
-	void scanLastPgId();
+	void scanLastPgId(part_id_t partidLatest);
 
 	//! alloc more pages
 	void expandTo(page_id_t pgid);
@@ -188,18 +196,12 @@ private:
 
 	bool m_needInit;
 
-	boost::ptr_array<boost::nullable<MappedFile>, PTNK_PARTID_MAX+1> m_parts;
+	boost::ptr_array<boost::nullable<MappedFile>, PTNK_PARTID_MAX+2> m_parts;
 
 	boost::mutex m_mtxAlloc;
 
-	//! active partition where new pages are created
-	/*!
-	 *	all other partitions are read-only
-	 */
-	MappedFile* m_active;
-
-	//! next free m_active local pgid
-	volatile page_id_t m_pgidNext;
+	//! last alloc-ed pgid
+	volatile page_id_t m_pgidLast;
 
 	//! first loaded partition id
 	part_id_t m_partidFirst;
