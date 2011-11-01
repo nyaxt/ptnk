@@ -444,7 +444,6 @@ DB::Tx::dumpStat() const
 void
 DB::rebase(bool force)
 {
-	// m_pio->newPart(false /* no force */);
 	m_tpio->rebase(force);
 }
 
@@ -462,6 +461,8 @@ DB::newPart(bool doRebase)
 void
 DB::compact()
 {
+	m_pio->newPart(false /* no force */);
+
 	PartitionedPageIO* ppio = dynamic_cast<PartitionedPageIO*>(m_pio.get());
 	if(! ppio)
 	{

@@ -20,6 +20,9 @@
 namespace ptnk
 {
 
+constexpr unsigned long PARTSIZEFILE_MAX = 1024 * 1024 * 1024; // 1GB
+constexpr unsigned long PARTSIZEFILE_MIN = 128 * 1024 * 1024; // 128MB
+
 MappedFile*
 MappedFile::createNew(part_id_t partid, const char* filename, ptnk_opts_t opts, int mode)
 {
@@ -40,7 +43,7 @@ MappedFile::createNew(part_id_t partid, const char* filename, ptnk_opts_t opts, 
 	}
 	
 	std::auto_ptr<MappedFile> mf(new MappedFile(partid, filename, fd, PROT_READ | PROT_WRITE));
-	mf->expandFile(1024 * 1024);
+	mf->expandFile(1024);
 
 	return mf.release();
 }
@@ -498,7 +501,7 @@ RETRY:
 #endif
 		boost::unique_lock<boost::mutex> g(m_mtxAlloc);
 
-		if(0) //if(m_pgidLNext >= 128 * 1024 * 1024 / PTNK_PAGE_SIZE)
+		if(m_pgidLNext >= PARTSIZEFILE_MAX / PTNK_PAGE_SIZE)
 		{
 			addNewPartition_unsafe();
 			m_pgidLNext = 0;
@@ -604,16 +607,10 @@ PartitionedPageIO::needInit() const
 void
 PartitionedPageIO::newPart(bool bForce)
 {
-	// FIXME: remount old part as read-only
-	if(! bForce)
-	{
-		// is new part. really needed?
+	// is new part. really needed?
+	if(! bForce && m_active->numPagesReserved() < PARTSIZEFILE_MIN / PTNK_PAGE_SIZE) return;	
 
-		if(m_active->numPagesReserved() < 128 * 1024 * 1024 / 4096) // less than 128mb
-		{
-			return;	
-		}
-	}
+	// FIXME: remount old part as read-only
 
 	boost::unique_lock<boost::mutex> g(m_mtxAlloc);
 	m_pgidLNext = PTNK_LOCALID_INVALID; // force later newPage() call to wait on m_mtxAlloc

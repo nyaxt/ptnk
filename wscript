@@ -253,6 +253,13 @@ def build(bld):
 		)
 
 	bld.program(
+		target = 'ptnk_mtpio',
+
+		use = 'TCMALLOC BOOST ptnk',
+		source = 'ptnk_mtpio.cpp'
+		)
+
+	bld.program(
 		target = 'ptnk_compact',
 
 		use = 'TCMALLOC BOOST ptnk',
