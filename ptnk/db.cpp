@@ -10,6 +10,7 @@
 #include "tpio.h"
 #include "tpio2.h"
 #include "overview.h"
+#include "helperthr.h"
 #include "sysutils.h"
 
 namespace ptnk
@@ -17,9 +18,17 @@ namespace ptnk
 
 DB::DB(const char* filename, ptnk_opts_t opts, int mode)
 {
+	if(opts & OHELPERTHREAD)
+	{
+		m_helper.reset(new Helper);	
+	}
+
 	if(filename && *filename != '\0' && (opts & OPARTITIONED))
 	{
-		m_pio.reset(new PartitionedPageIO(filename, opts, mode));	
+		PartitionedPageIO* ppio;
+		m_pio.reset((ppio = new PartitionedPageIO(filename, opts, mode)));
+
+		ppio->attachHelper(m_helper.get());
 	}
 	else
 	{
@@ -511,6 +520,7 @@ DB::dumpGraph(FILE* fp) const
 void
 DB::dumpStat() const
 {
+	std::cout << "*** DB dump ***" << std::endl;
 	std::cout << *m_tpio << std::endl;
 }
 

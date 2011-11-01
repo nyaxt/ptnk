@@ -169,6 +169,7 @@ def build(bld):
 		ptnk/tpio.cpp
 		ptnk/tpio2.cpp
 		ptnk/overview.cpp
+		ptnk/helperthr.cpp
 		ptnk/db.cpp
 		ptnk.cpp
 		''',
@@ -190,6 +191,14 @@ def build(bld):
 	if not bld.env.LIB_GTEST or len(bld.env.LIB_GTEST) == 0:
 		Logs.warn('gtest is not found / skipping ptnk_test')
 	else:
+		bld.program(
+			target = 'helper_test',
+
+			features = 'gtest',
+			use = 'TCMALLOC PTHREAD BOOST_THREAD GTEST ptnk',
+			source = 'helper_test.cpp'
+			)
+
 		bld.program(
 			target = 'stm_test',
 

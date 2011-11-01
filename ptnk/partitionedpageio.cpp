@@ -1,5 +1,6 @@
 #include "partitionedpageio.h"
 #include "pageiomem.h"
+#include "helperthr.h"
 #include "sysutils.h"
 
 #include <stdio.h>
@@ -22,6 +23,7 @@ namespace ptnk
 
 constexpr unsigned long PARTSIZEFILE_MAX = 1024 * 1024 * 1024; // 1GB
 constexpr unsigned long PARTSIZEFILE_MIN = 128 * 1024 * 1024; // 128MB
+constexpr unsigned long PARTSIZEFILE_STARTALLOC = 32 * 1024 * 1024; // 128MB
 
 MappedFile*
 MappedFile::createNew(part_id_t partid, const char* filename, ptnk_opts_t opts, int mode)
@@ -147,7 +149,7 @@ MappedFile::moreMMap(size_t pgs)
 			std::cerr << "m_fd: " << m_fd<< std::endl;	
 		};
 	}
-	PTNK_ASSERT(mapstart);
+	PTNK_CHECK(mapstart);
 
 	if(mapstart == hint)
 	{
@@ -231,7 +233,7 @@ MappedFile::sync(local_pgid_t pgidStart, local_pgid_t pgidEnd)
 
 			pgidStart = m->pgidEnd;
 			m = m->next.get();
-			if(! m) break;
+			if(! m) break; // FIXME: obviously not needed
 		}
 		else
 		{
@@ -246,10 +248,17 @@ MappedFile::sync(local_pgid_t pgidStart, local_pgid_t pgidEnd)
 }
 
 void
-MappedFile::dumpStat() const
+MappedFile::dump(std::ostream& o) const
 {
-	std::cout << "- partition id: " << (boost::format("%03x") % partid()) << std::endl;	
-	std::cout << "  filename: " << m_filename << std::endl;	
+	o << "- partition id: " << (boost::format("%03x") % partid()) << std::endl;	
+	o << "  filename: " << m_filename << std::endl;	
+
+	const Mapping* m = &m_mapFirst;
+	while(m)
+	{
+		o << "  | map pgidEnd: " << m->pgidEnd << " offset: " << (void*)m->offset << std::endl;
+		m = m->next.get();
+	}
 }
 
 void
@@ -260,9 +269,9 @@ MappedFile::discardFile()
 }
 
 PartitionedPageIO::PartitionedPageIO(const char* dbprefix, ptnk_opts_t opts, int mode)
-:	m_mode(mode), m_opts(opts), m_active(NULL), m_pgidLNext(0), m_partidFirst(0), m_partidLast(0)
+:	m_mode(mode), m_opts(opts), m_active(nullptr), m_pgidNext(0), m_partidFirst(0), m_partidLast(0), m_helper(nullptr), m_isHelperInvoked(true)
 {
-	PTNK_ASSERT(dbprefix != NULL && *dbprefix != '\0');
+	PTNK_CHECK(dbprefix != NULL && *dbprefix != '\0');
 	m_dbprefix = dbprefix;
 	
 	openFiles();
@@ -293,7 +302,7 @@ PartitionedPageIO::PartitionedPageIO(const char* dbprefix, ptnk_opts_t opts, int
 		}
 		else
 		{
-			scanLastPgId(); // set m_pgidLNext correct value
+			scanLastPgId(); // set m_pgidNext correct value
 			m_needInit = false;	
 		}
 	}
@@ -441,13 +450,24 @@ void
 PartitionedPageIO::scanLastPgId()
 {
 	// find last committed pg
-	for(local_pgid_t pgidL = m_active->numPagesReserved() - 1; pgidL != ~0UL; -- pgidL)
+	
+	// FIXME: partid wrap arround not considered!!!
+	for(part_id_t partid = m_active->partid(); partid != PTNK_PARTID_INVALID; -- partid) 
 	{
-		Page pg(readPage(PGID_PARTLOCAL(m_active->partid(), pgidL)));
-		if(pg.isCommitted())
+		std::cout << "scan partid: " << std::hex << partid << std::endl;
+
+		MappedFile* part = &m_parts[partid];
+		PTNK_CHECK(part);
+		for(local_pgid_t pgidL = part->numPagesReserved() - 1; pgidL != ~0UL; -- pgidL)
 		{
-			m_pgidLNext = pgidL + 1;
-			break;
+			page_id_t pgid = PGID_PARTLOCAL(part->partid(), pgidL);
+			Page pg(readPage(pgid));
+			// std::cout << "scan pg " << pgid2str(pgid) << " commited: " << pg.isCommitted() << std::endl;
+			if(pg.isCommitted())
+			{
+				m_pgidNext = PGID_PARTLOCAL(part->partid(), pgidL + 1);
+				return;
+			}
 		}
 	}
 }
@@ -486,51 +506,76 @@ PartitionedPageIO::addNewPartition_unsafe()
 	return p;
 }
 
+void
+PartitionedPageIO::expandTo(page_id_t pgid)
+{
+	boost::unique_lock<boost::mutex> g(m_mtxAlloc);
+	PTNK_ASSERT(m_pgidNext != PGID_INVALID);
+
+	// make sure that other thread has not already alloced pages
+	static_assert(sizeof(ssize_t) >= sizeof(page_id_t), "below code will not work properly");
+	ssize_t numNeeded = pgid - PGID_PARTLOCAL(m_active->partid(), m_active->numPagesReserved()) + 1;
+	if(numNeeded <= 0) return;
+
+	if(PGID_LOCALID(m_pgidNext) >= PARTSIZEFILE_MAX / PTNK_PAGE_SIZE)
+	{
+		// need new partition
+
+		addNewPartition_unsafe();
+		m_pgidNext = PGID_PARTLOCAL(m_active->partid(), 0);
+	}
+	else
+	{
+		// expand current partition
+
+		m_active->expandFile(numNeeded);
+	}
+
+	#ifdef VERBOSE_PAGEIO
+	std::cout << "new pgid max: " << pgid2str(PGID_PARTLOCAL(m_active->partid(), m_active->numPagesReserved())) << std::endl;
+	#endif
+}
+
 pair<Page, page_id_t>
 PartitionedPageIO::newPage()
 {
-	local_pgid_t pgidL;
-
-RETRY:
-	pgidL = m_pgidLNext;
-	if(pgidL >= m_active->numPagesReserved())
+	page_id_t pgid;
+	do
 	{
-		// need more pages...
-#ifdef VERBOSE_PAGEIO
-		std::cout << "running out of space" << std::endl;
-#endif
-		boost::unique_lock<boost::mutex> g(m_mtxAlloc);
+		pgid = m_pgidNext;
 
-		if(m_pgidLNext >= PARTSIZEFILE_MAX / PTNK_PAGE_SIZE)
+		ssize_t numNeeded = pgid - PGID_PARTLOCAL(m_active->partid(), m_active->numPagesReserved()) + 1;
+
+		// preallocate helper
+	#if 0
+		if(!m_isHelperInvoked && numNeeded > - PARTSIZEFILE_STARTALLOC/PTNK_PAGE_SIZE)
 		{
-			addNewPartition_unsafe();
-			m_pgidLNext = 0;
-			goto RETRY;
-		}
+			// make helper pre-allocate pages
+			if(__sync_bool_compare_and_swap(&m_isHelperInvoked, false, true))
+			{
+				m_helper->enq([this]() {
+					
 
-		// make sure that other thread has not already alloced pages
-		ssize_t numNeeded = m_pgidLNext - m_active->numPagesReserved() + 1;
-		if(numNeeded > 0)
+					m_isHelperInvoked = false;	
+				});
+			}
+		}
+	#endif
+
+		if(pgid == PGID_INVALID || numNeeded > 0)
 		{
-#ifdef VERBOSE_PAGEIO
-			std::cout << "I'm the one going to alloc!!!: " << boost::this_thread::get_id() << std::endl;
-#endif
-			// do alloc
-			m_active->expandFile(numNeeded);
+			// need more pages...
+	#ifdef VERBOSE_PAGEIO
+			std::cout << "running out of space" << std::endl;
+	#endif
+			expandTo(pgid);
+			
+			continue;
 		}
-		
-		goto RETRY;
 	}
+	while(! __sync_bool_compare_and_swap(&m_pgidNext, pgid, pgid+1));
 
-	if(! __sync_bool_compare_and_swap(&m_pgidLNext, pgidL, pgidL+1))
-	{
-		// reservation failed
-
-		goto RETRY;
-	}
-
-	page_id_t pgid = PGID_PARTLOCAL(m_active->partid(), pgidL);
-	return make_pair(Page(m_active->calcPtr(pgidL), true), pgid);
+	return make_pair(Page(m_active->calcPtr(PGID_LOCALID(pgid)), true), pgid);
 }
 
 Page
@@ -573,10 +618,17 @@ PartitionedPageIO::syncRange(page_id_t pgidStart, page_id_t pgidEnd)
 page_id_t
 PartitionedPageIO::getLastPgId() const
 {
-	part_id_t partid = m_active->partid();
-	local_pgid_t localid = m_pgidLNext - 1;
+	PTNK_ASSERT(m_pgidNext != 0);
+	page_id_t ret = m_pgidNext - 1;
+	if(PGID_LOCALID(ret) == PGID_LOCALID_MASK)
+	{
+		part_id_t partid = PGID_PARTID(ret);
+		local_pgid_t pgidL = m_parts[partid].numPagesReserved();
+		PTNK_ASSERT(pgidL > 0);
+		ret = PGID_PARTLOCAL(partid, pgidL - 1);
+	}
 
-	return PGID_PARTLOCAL(partid, localid);
+	return ret;
 }
 
 local_pgid_t
@@ -584,7 +636,7 @@ PartitionedPageIO::getPartLastLocalPgId(part_id_t partid) const
 {
 	if(partid == m_active->partid())
 	{
-		return m_pgidLNext - 1;	
+		return PGID_LOCALID(m_pgidNext) - 1;	
 	}
 
 	if(! m_parts.is_null(partid))
@@ -613,20 +665,27 @@ PartitionedPageIO::newPart(bool bForce)
 	// FIXME: remount old part as read-only
 
 	boost::unique_lock<boost::mutex> g(m_mtxAlloc);
-	m_pgidLNext = PTNK_LOCALID_INVALID; // force later newPage() call to wait on m_mtxAlloc
+	m_pgidNext = PGID_INVALID; // force later expandTo() call to wait on m_mtxAlloc
 
 	addNewPartition_unsafe();
-	m_pgidLNext = 0;
+	m_pgidNext = PGID_PARTLOCAL(m_active->partid(), 0);
 }
 
 void
 PartitionedPageIO::dumpStat() const
 {
-	std::cout << "* PartitionedPageIO stat dump *" << std::endl;
-	std::cout << " - partidFirst: " << m_partidFirst << " Last: " << m_partidLast << std::endl;
-	BOOST_FOREACH(const MappedFile& part, m_parts)
+	std::cout << *this;
+}
+
+void
+PartitionedPageIO::dump(std::ostream& s) const
+{
+	s << "* PartitionedPageIO stat dump *" << std::endl;
+	s << "# pgidLast: " << pgid2str(getLastPgId()) << std::endl;
+	s << "# partidFirst: " << m_partidFirst << " Last: " << m_partidLast << std::endl;
+	for(const MappedFile& part: m_parts)
 	{
-		if(&part) part.dumpStat();
+		if(&part) s << part;
 	}
 }
 

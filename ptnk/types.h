@@ -16,7 +16,7 @@ namespace ptnk {
 #define PGID_LOCALID(pgid) ((pgid) & PGID_LOCALID_MASK)
 #define PGID_PARTID(pgid) ((pgid) >> 52)
 #define PGID_PARTSTART(partid) (((page_id_t)(partid)) << 52)
-#define PGID_PARTLOCAL(partid, localid) (PGID_PARTSTART(partid) | (localid & PGID_LOCALID_MASK))
+#define PGID_PARTLOCAL(partid, localid) (PGID_PARTSTART(partid) | ((localid) & PGID_LOCALID_MASK))
 typedef uint64_t page_id_t;
 typedef std::set<page_id_t> Spage_id_t;
 typedef std::vector<page_id_t> Vpage_id_t;
@@ -71,7 +71,14 @@ enum
 	/*! db files are partitioned */
 	P_(OPARTITIONED) = 1 << 4,
 
-	P_(ODEFAULT) = P_(OWRITER) | P_(OCREATE) | P_(OAUTOSYNC) | P_(OPARTITIONED),
+	/*! spawn helper thread for background page alloc / compaction */
+	/*!
+	 *	@note The helper thread is not required for ptnk to work.
+	 *	      Only for additional performance improvements (although it is huge).
+	 */
+	P_(OHELPERTHREAD) = 1 << 5,
+
+	P_(ODEFAULT) = P_(OWRITER) | P_(OCREATE) | P_(OAUTOSYNC) | P_(OPARTITIONED) | P_(OHELPERTHREAD),
 };
 
 enum put_mode_t

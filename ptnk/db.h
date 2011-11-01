@@ -17,6 +17,7 @@ class TPIO2;
 class TPIO2TxSession;
 
 class PageIO;
+class Helper;
 
 class DB
 {
@@ -173,6 +174,8 @@ public:
 private:
 	shared_ptr<PageIO> m_pio;
 	boost::scoped_ptr<TPIO2> m_tpio;
+
+	unique_ptr<Helper> m_helper;
 };
 
 } // end of namespace ptnk

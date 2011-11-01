@@ -673,6 +673,7 @@ TPIO2::dump(std::ostream& s) const
 {
 	s << "** TPIO dump **" << std::endl;
 	s << m_stat;
+	m_backend->dumpStat(); // FIXME!
 }
 
 } // end of namespace ptnk

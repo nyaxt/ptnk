@@ -3598,10 +3598,11 @@ TEST(ptnk, PartitionedPageIO_scanfile)
 	t_makedummyfile("./_testtmp/ppioscanfile.001.ptnk");
 	t_makedummyfile("./_testtmp/ppioscanfile.abc.ptnk");
 	t_makedummyfile("./_testtmp/ppioscanfile.ffe.ptnk");
-	t_makedummyfile("./_testtmp/ppioscanfile.fff.ptnk");
+	t_makedummyfile("./_testtmp/ppioscanfile.fff.ptnk"); // invalid!
 
-	boost::scoped_ptr<PartitionedPageIO> ppio(new PartitionedPageIO("_testtmp/ppioscanfile", ODEFAULT));
-	EXPECT_EQ(4U, ppio->numPartitions_());
+	PartitionedPageIO::Vpartfile_t files;
+	PartitionedPageIO::scanFiles(&files, "_testtmp/ppioscanfile");
+	EXPECT_EQ(4U, files.size());
 }
 
 TEST(ptnk, PartitionedPageIO_basic)
@@ -3630,7 +3631,7 @@ TEST(ptnk, PartitionedPageIO_basic)
 		Page pg; page_id_t pgid;
 		boost::tie(pg, pgid) = pio.newPage();
 
-		ASSERT_TRUE(ptr_valid(pg.getRaw())) << "ptr of new page invalid. pgid: " << pgid2str(pgid);
+		ASSERT_TRUE(ptr_valid(pg.getRaw())) << "ptr of new page invalid. pgid: " << pgid2str(pgid) << " i: " << i;
 	}
 }
 
@@ -3709,7 +3710,7 @@ TEST(ptnk, PartitionedPageIO_newpart)
 			}
 			db.newPart();
 		}
-		// db.dumpStat();
+		db.dumpStat();
 	}
 	
 	// load dbfile

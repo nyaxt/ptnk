@@ -44,13 +44,14 @@ public:
 		return m_filename;
 	}
 
-	void dumpStat() const;
 	void discardFile();
 
 	bool isFile() const
 	{
 		return ! m_filename.empty();	
 	}
+
+	void dump(std::ostream& s) const;
 	
 private:
 	//! struct corresponding to mmap-ed region (linked list)
@@ -92,6 +93,9 @@ private:
 
 	local_pgid_t m_numPagesReserved;
 };
+inline
+std::ostream& operator<<(std::ostream& s, const MappedFile& o)
+{ o.dump(s); return s; }
 
 inline
 char*
@@ -108,6 +112,8 @@ MappedFile::calcPtr(local_pgid_t pgid)
 	return NULL;
 }
 
+class Helper;
+
 class PartitionedPageIO : public PageIO
 {
 public:
@@ -117,11 +123,14 @@ public:
 	 *		ex. "/db/file/path/dbname"
 	 */
 	PartitionedPageIO(const char* dbprefix, ptnk_opts_t opts, int mode = 0644);
+	void attachHelper(Helper* helper) { m_helper = helper; }
 
 	~PartitionedPageIO();
 
 	typedef pair<std::string, part_id_t> partfile_t;
 	typedef std::vector<partfile_t> Vpartfile_t;
+
+	void dump(std::ostream& s) const;
 
 	//! scan for partitioned db files
 	static void scanFiles(Vpartfile_t* files, const char* dbprefix);
@@ -158,9 +167,15 @@ private:
 	void openFiles();
 
 	//! add new partition
+	/*!
+	 *	@caution m_mtxAlloc must be locked whle calling function.
+	 */
 	MappedFile* addNewPartition_unsafe();
 
 	void scanLastPgId();
+
+	//! alloc more pages
+	void expandTo(page_id_t pgid);
 
 	//! db prefix str. see C-tor param
 	std::string m_dbprefix;
@@ -184,14 +199,26 @@ private:
 	MappedFile* m_active;
 
 	//! next free m_active local pgid
-	volatile local_pgid_t m_pgidLNext;
+	volatile page_id_t m_pgidNext;
 
 	//! first loaded partition id
 	part_id_t m_partidFirst;
 
 	//! last partition id
 	part_id_t m_partidLast;
+
+	//! helper thr
+	Helper* m_helper;
+
+	//! make sure that helper job do not duplicate
+	/*!
+	 *	@sa newPage() impl.
+	 */
+	bool m_isHelperInvoked;
 };
+inline
+std::ostream& operator<<(std::ostream& s, const PartitionedPageIO& o)
+{ o.dump(s); return s; }
 
 } // end of namespace ptnk
 
