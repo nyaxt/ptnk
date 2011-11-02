@@ -174,7 +174,7 @@ private:
 
 	shared_ptr<PageIO> m_backend;
 
-	boost::mutex m_mtxAOvr;
+	boost::shared_mutex m_mtxAOvr;
 	shared_ptr<ActiveOvr> m_aovr;
 
 	TPIOStat m_stat;
