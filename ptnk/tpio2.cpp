@@ -240,7 +240,11 @@ TPIO2::newTransaction()
 		MUTEXPROF_END;
 	}
 
-	shared_ptr<ActiveOvr> aovr = m_aovr;
+	shared_ptr<ActiveOvr> aovr;
+	{
+		boost::unique_lock<boost::mutex> g(m_mtxAOvr);
+		aovr = m_aovr;
+	}
 	unique_ptr<LocalOvr> lovr = aovr->newTx();
 	return unique_ptr<TPIO2TxSession>(new TPIO2TxSession(this, move(aovr), move(lovr)));
 }
@@ -447,7 +451,10 @@ TPIO2::restoreState()
 
 	// 3. for each pages found in the scan, sorted by its version,
 	//    add ovr entries and handle streak data per tx
-	m_aovr = shared_ptr<ActiveOvr>(new ActiveOvr(pgidStartPage, verBase));
+	{
+		boost::unique_lock<boost::mutex> g(m_mtxAOvr);
+		m_aovr = shared_ptr<ActiveOvr>(new ActiveOvr(pgidStartPage, verBase));
+	}
 	unique_ptr<TPIO2TxSession> tx = newTransaction();
 	tx_id_t verCurrent = verBase;
 	Buffer bufStreak; bufStreak.reset();
