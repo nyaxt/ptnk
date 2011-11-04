@@ -135,6 +135,7 @@ MappedFile::moreMMap(size_t pgs)
 	MUTEXPROF_START("moreMMap");
 	Mapping* mLast = getmLast();
 
+	static char* s_lastmapend = PTNK_MMAP_HINT;
 	char* mapstart;
 	char* hint;
 	if(mLast->offset)
@@ -143,7 +144,7 @@ MappedFile::moreMMap(size_t pgs)
 	}
 	else
 	{
-		hint = PTNK_MMAP_HINT;
+		hint = s_lastmapend;
 	}
 
 	if(isFile())
@@ -167,6 +168,7 @@ MappedFile::moreMMap(size_t pgs)
 		};
 	}
 	PTNK_CHECK(mapstart);
+	s_lastmapend = mapstart + PTNK_PAGE_SIZE*pgs;
 
 	if(!mLast->offset || mapstart == hint)
 	{
