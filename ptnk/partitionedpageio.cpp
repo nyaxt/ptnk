@@ -136,7 +136,15 @@ MappedFile::moreMMap(size_t pgs)
 	Mapping* mLast = getmLast();
 
 	char* mapstart;
-	char* hint = (mLast->offset != NULL) ? mLast->offset + mLast->pgidEnd * PTNK_PAGE_SIZE : PTNK_MMAP_HINT;
+	char* hint;
+	if(mLast->offset)
+	{
+		hint = mLast->offset + mLast->pgidEnd * PTNK_PAGE_SIZE;
+	}
+	else
+	{
+		hint = PTNK_MMAP_HINT;
+	}
 
 	if(isFile())
 	{
@@ -160,23 +168,31 @@ MappedFile::moreMMap(size_t pgs)
 	}
 	PTNK_CHECK(mapstart);
 
-	if(mapstart == hint)
+	if(!mLast->offset || mapstart == hint)
 	{
-		// newly mapped region contiguous to current one...
-		
-		m_numPagesReserved = mLast->pgidEnd = mLast->pgidEnd + pgs;
+		// newly mapped region contiguous to current one
 		if(! mLast->offset) mLast->offset = mapstart;
+		mLast->pgidEnd += pgs;
+
+		PTNK_MEMBARRIER_COMPILER;
+
+		m_numPagesReserved = mLast->pgidEnd;
 	}
 	else
 	{
-		std::auto_ptr<Mapping> mNew(new Mapping);
+		// add new mapping
+		unique_ptr<Mapping> mNew(new Mapping);
 
-		m_numPagesReserved = mNew->pgidEnd = mLast->pgidEnd + pgs;
+		mNew->pgidEnd = mLast->pgidEnd + pgs;
 		mNew->offset = mapstart - mLast->pgidEnd * PTNK_PAGE_SIZE;
 
 		PTNK_MEMBARRIER_COMPILER;
 		
-		mLast->next = mNew; // move semantics
+		mLast->next = move(mNew);
+
+		PTNK_MEMBARRIER_COMPILER;
+
+		m_numPagesReserved = mLast->next->pgidEnd;
 	}
 	MUTEXPROF_END;
 }

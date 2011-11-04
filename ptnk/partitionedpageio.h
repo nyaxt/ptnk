@@ -63,7 +63,7 @@ private:
 		char* offset;
 
 		//! ptr to next mapping
-		std::auto_ptr<Mapping> next;
+		unique_ptr<Mapping> next;
 	};
 
 	MappedFile(part_id_t partid, const char* filename, int fd, int prot);
