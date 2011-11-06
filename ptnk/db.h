@@ -23,7 +23,7 @@ class DB
 {
 public:
 	DB(const char* filename = NULL, ptnk_opts_t opts = ODEFAULT, int mode = 0644);
-	DB(const shared_ptr<PageIO>& pio);
+	DB(const shared_ptr<PageIO>& pio, ptnk_opts_t opts = ODEFAULT);
 
 	void initCommon();
 

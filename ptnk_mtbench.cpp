@@ -64,7 +64,6 @@ run_bench()
 	Bench b((boost::format("%1% %2%") % PROGNAME % comment).str());
 	{
 		const int NUM_KEYS_PER_TH = NUM_KEYS / NUM_THREADS;
-		SETUP_ORD(NUM_KEYS);
 
 		ptnk_opts_t opts = OWRITER | OCREATE | OTRUNCATE | OPARTITIONED | OHELPERTHREAD;
 		if(do_sync) opts |= OAUTOSYNC;
@@ -77,7 +76,7 @@ run_bench()
 		boost::thread_group tg;
 		for(int i = 0; i < NUM_THREADS; ++ i)
 		{
-			tg.create_thread(put_ary_db(db, &ord[NUM_KEYS_PER_TH * i], NUM_KEYS_PER_TH));
+			tg.create_thread(put_ary_db(db, &keys[NUM_KEYS_PER_TH * i], NUM_KEYS_PER_TH));
 		}
 		tg.join_all();
 

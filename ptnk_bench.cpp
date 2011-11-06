@@ -79,19 +79,4 @@ run_bench()
 	}
 	b.end();
 	b.dump();
-
-#if 0
-	Buffer v(32);
-	char bufCorrect[9]; bufCorrect[9] = '\0';
-	for(int i = 0; i < NUM_KEYS; ++ i)
-	{
-		sprintf(bufCorrect, "%08u", i);
-
-		db.get(i, v);
-		ASSERT_TRUE(v.isValid());
-		EXPECT_EQ(::strlen(bufCorrect)+1, v.valsize()) << "incorrect val length for " << i;
-		EXPECT_STREQ(bufCorrect, v.get()) << "incorrect val str for " << i;
-	}
-	return 0;
-#endif
 }

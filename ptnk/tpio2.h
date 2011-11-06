@@ -128,7 +128,7 @@ constexpr unsigned int REBASE_THRESHOLD = TPIO_NHASH * 8;
 class TPIO2
 {
 public:
-	TPIO2(shared_ptr<PageIO> backend);
+	TPIO2(shared_ptr<PageIO> backend, ptnk_opts_t opts);
 
 	~TPIO2();
 
@@ -173,6 +173,7 @@ private:
 	void restoreState();
 
 	shared_ptr<PageIO> m_backend;
+	bool m_sync;
 
 	boost::shared_mutex m_mtxAOvr;
 	shared_ptr<ActiveOvr> m_aovr;

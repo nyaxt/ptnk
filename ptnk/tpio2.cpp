@@ -203,8 +203,9 @@ TPIO2TxSession::loadStreak(BufferCRef bufStreak)
 	oldlink()->restore(bufStreak);
 }
 
-TPIO2::TPIO2(shared_ptr<PageIO> backend)
+TPIO2::TPIO2(shared_ptr<PageIO> backend, ptnk_opts_t opts)
 :	m_backend(backend),
+	m_sync(opts & OAUTOSYNC),
 	m_bDuringRebase(false)
 {
 	if(m_backend->needInit())
@@ -252,6 +253,8 @@ TPIO2::newTransaction()
 void
 TPIO2::syncDelayed(const Vpage_id_t& pagesModified)
 {
+	if(! m_sync) return;
+
 #ifdef TXSESSION_BATCH_SYNC
 	if(! pagesModified.empty())
 	{

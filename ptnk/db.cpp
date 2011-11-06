@@ -35,12 +35,15 @@ DB::DB(const char* filename, ptnk_opts_t opts, int mode)
 		m_pio.reset(new PageIOMem(filename, opts, mode));
 	}
 
+	m_tpio.reset(new TPIO2(m_pio, opts));
 	initCommon();
 }
 
-DB::DB(const shared_ptr<PageIO>& pio)
+DB::DB(const shared_ptr<PageIO>& pio, ptnk_opts_t opts)
 {
+	// FIXME: OHELPERTHREAD would be ignored
 	m_pio = pio;
+	m_tpio.reset(new TPIO2(m_pio, opts));
 	initCommon();
 }
 
@@ -63,8 +66,6 @@ DB::drop(const char* filename)
 void
 DB::initCommon()
 {
-	m_tpio.reset(new TPIO2(m_pio));
-
 	if(m_pio->needInit())
 	{
 		boost::scoped_ptr<Tx> tx(newTransaction());
