@@ -120,7 +120,7 @@ int main(int argc, char** argv)
 	{
 		keys[i] = i;
 	}
-	if(do_random) for(int i = 0; i < NUM_KEYS*3; ++ i)
+	if(do_random) for(int j = 0; j < 3; ++ j) for(int i = 0; i < NUM_KEYS; ++ i)
 	{
 		std::swap(keys[i], keys[rand() % NUM_KEYS]);
 	}

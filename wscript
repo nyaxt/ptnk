@@ -16,7 +16,7 @@ def options(opt):
 	opt.add_option('--with-dtrace', action='store_true', default=False, help='enable DTrace/SystemTap probes', dest='dtrace')
 
 def configure(conf):
-	conf.env.append_unique('CXXFLAGS', ['-Wall', '-g'])
+	conf.env.append_unique('CXXFLAGS', ['-Wall', '-g', '-march=native'])
 	conf.env.append_unique('INCLUDES', ['/home/kouhei/local/include', '/usr/local/include', '/opt/local/include'])
 	conf.env.append_unique('LIBPATH', ['/home/kouhei/local/lib', '/usr/local/lib', '/opt/local/lib'])
 
