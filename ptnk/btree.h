@@ -119,7 +119,7 @@ void btree_cursor_dump(btree_cursor_t* cur, PageIO* pio);
 
 #ifndef PTNK_NO_CURSOR_WRAP
 
-class btree_cursor_wrap : boost::noncopyable
+class btree_cursor_wrap : noncopyable
 {
 public:
 	btree_cursor_wrap()

@@ -1,7 +1,8 @@
 #ifndef _ptnk_partitionedpageio_h_
 #define _ptnk_partitionedpageio_h_
 
-#include <boost/ptr_container/ptr_array.hpp>
+#include <array>
+
 #include <boost/thread.hpp>
 
 #include "pageio.h"
@@ -178,7 +179,7 @@ private:
 	/*!
 	 *	@caution m_mtxAlloc must be locked whle calling function.
 	 */
-	MappedFile* addNewPartition_unsafe();
+	void addNewPartition_unsafe();
 
 	void scanLastPgId(part_id_t partidLatest);
 
@@ -196,7 +197,7 @@ private:
 
 	bool m_needInit;
 
-	boost::ptr_array<boost::nullable<MappedFile>, PTNK_PARTID_MAX+2> m_parts;
+	std::array<unique_ptr<MappedFile>, PTNK_PARTID_MAX+2> m_parts;
 
 	boost::mutex m_mtxAlloc;
 

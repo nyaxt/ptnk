@@ -4,12 +4,11 @@
 #include "page.h"
 #include "buffer.h"
 #include "types.h"
-#include <boost/utility.hpp>
 
 namespace ptnk
 {
 
-struct mod_info_t : boost::noncopyable
+struct mod_info_t : noncopyable
 {
 	//! the original read page's ovr tgt
 	page_id_t idOrig;

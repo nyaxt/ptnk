@@ -63,6 +63,13 @@ using std::unique_ptr;
 using std::shared_ptr;
 using std::tie;
 
+struct noncopyable
+{
+	noncopyable() = default;
+	noncopyable(const noncopyable&) = delete;
+	noncopyable& operator=(const noncopyable&) = delete;
+};
+
 // === misc template utils ===
 
 template<typename T>

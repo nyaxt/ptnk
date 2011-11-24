@@ -24,8 +24,6 @@
 #include <dirent.h>
 #include <sys/types.h>
 
-#include <boost/tuple/tuple.hpp>
-
 #include <gtest/gtest.h>
 using namespace ptnk;
 
@@ -2437,7 +2435,7 @@ TEST(ptnk, btree_cursor_del)
 		if(i % 2)
 		{
 			bool bCurValid;
-			boost::tie(bCurValid, idRoot) = btree_cursor_del(cur.get(), pio.get());
+			tie(bCurValid, idRoot) = btree_cursor_del(cur.get(), pio.get());
 			ASSERT_EQ(i != COUNT-1, bCurValid);
 		}
 		else
@@ -2537,7 +2535,7 @@ TEST(ptnk, btree_cursor_del_wholeleaf)
 		EXPECT_STREQ(val, v.get()) << "i: " << i;
 
 		bool bCurValid;
-		boost::tie(bCurValid, idRoot) = btree_cursor_del(cur.get(), pio.get());
+		tie(bCurValid, idRoot) = btree_cursor_del(cur.get(), pio.get());
 		ASSERT_EQ(true, bCurValid) << "i: " << i;
 	}
 	for(; i < COUNT; ++ i)
@@ -3612,14 +3610,14 @@ TEST(ptnk, PartitionedPageIO_basic)
 	PartitionedPageIO pio("./_testtmp/ppio_basic", OWRITER | OCREATE | OTRUNCATE);
 
 	Page pg; page_id_t pgid;
-	boost::tie(pg, pgid) = pio.newPage();
+	tie(pg, pgid) = pio.newPage();
 
 	// std::cout << "pgid: " << pgid2str(pgid) << std::endl;
 	// std::cout << "pg addr: " << (void*)pg.getRaw() << std::endl;
 	ASSERT_TRUE(ptr_valid(pg.getRaw())) << "ptr of new page invalid";
 
 	Page pg2; page_id_t pgid2;
-	boost::tie(pg2, pgid2) = pio.newPage();
+	tie(pg2, pgid2) = pio.newPage();
 
 	ASSERT_TRUE(ptr_valid(pg2.getRaw())) << "ptr of new page2 invalid";
 	ASSERT_NE(pgid, pgid2);
@@ -3629,7 +3627,7 @@ TEST(ptnk, PartitionedPageIO_basic)
 	for(int i = 0; i < 2000; ++ i)
 	{
 		Page pg; page_id_t pgid;
-		boost::tie(pg, pgid) = pio.newPage();
+		tie(pg, pgid) = pio.newPage();
 
 		ASSERT_TRUE(ptr_valid(pg.getRaw())) << "ptr of new page invalid. pgid: " << pgid2str(pgid) << " i: " << i;
 	}

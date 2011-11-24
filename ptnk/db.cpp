@@ -414,7 +414,7 @@ DB::Tx::curDelete(cursor_t* cur)
 	page_id_t pgidNewRoot;
 	bool bNextExist;
 
-	boost::tie(bNextExist, pgidNewRoot) = btree_cursor_del(cur->curBTree, m_pio.get());
+	tie(bNextExist, pgidNewRoot) = btree_cursor_del(cur->curBTree, m_pio.get());
 
 	if(pgidNewRoot != pgidOldRoot)
 	{

@@ -122,7 +122,7 @@ Node::query(const query_t& query) const
 	else
 	{
 		BufferCRef key; page_id_t _;
-		boost::tie(key, _) = kp(i);
+		tie(key, _) = kp(i);
 		if(! bufeq(key, query.key)) -- i;
 	}
 
@@ -627,7 +627,7 @@ Node::dump_(PageIO* pio) const
 	for(i = 0; i < numKeys; ++ i)
 	{
 		BufferCRef k; page_id_t p;
-		boost::tie(k, p) = kp(i);
+		tie(k, p) = kp(i);
 
 		out1 += k.inspect(); out1 += "  |*|";
 		out2 += "    "; out2 += pgid2str(p);
@@ -651,7 +651,7 @@ Node::dump_(PageIO* pio) const
 		for(i = 0; i < numKeys; ++ i)
 		{
 			BufferCRef k; page_id_t p;
-			boost::tie(k, p) = kp(i);
+			tie(k, p) = kp(i);
 
 			if(p == pageId())
 			{
@@ -682,7 +682,7 @@ Node::dumpGraph_(FILE* fp, PageIO* pio) const
 	for(i = 0; i < numKeys; ++ i)
 	{
 		BufferCRef k; page_id_t p;
-		boost::tie(k, p) = kp(i);
+		tie(k, p) = kp(i);
 		
 		if(i < numKeys)
 		{
@@ -1068,7 +1068,7 @@ Leaf::query(btree_cursor_t* cursor, const query_t& q) const
 	if(q.type & F_LOWER_BOUND)
 	{
 		bool isExact;
-		boost::tie(i, isExact) = idx_lower_bound(0, numKVs, q.key);
+		tie(i, isExact) = idx_lower_bound(0, numKVs, q.key);
 
 		if(q.type == MATCH_EXACT)
 		{
@@ -1094,7 +1094,7 @@ Leaf::query(btree_cursor_t* cursor, const query_t& q) const
 	else /* F_UPPER_BOUND */
 	{
 		bool foundExact;
-		boost::tie(i, foundExact) = idx_upper_bound(0, numKVs, q.key);
+		tie(i, foundExact) = idx_upper_bound(0, numKVs, q.key);
 
 		if(q.type == AFTER)
 		{
@@ -1300,7 +1300,7 @@ Leaf::get(BufferCRef key, BufferRef value) const
 	PTNK_ASSERT(key.isValid());
 
 	int i; bool isExact;
-	boost::tie(i, isExact) = idx_lower_bound(0, footer().numKVs, key);
+	tie(i, isExact) = idx_lower_bound(0, footer().numKVs, key);
 	if(i == footer().numKVs) return -1;
 
 	if(isExact)
@@ -1352,7 +1352,7 @@ Leaf::insert(BufferCRef key, BufferCRef value, btree_split_t* split, bool* bOvr,
 
 	// find the new kv idx
 	int new_i; bool foundExact;
-	boost::tie(new_i, foundExact) = idx_upper_bound(0, numKVs(), key);
+	tie(new_i, foundExact) = idx_upper_bound(0, numKVs(), key);
 
 	if(! foundExact)
 	{
@@ -1575,7 +1575,7 @@ Leaf::update(BufferCRef key, BufferCRef value, btree_split_t* split, bool* bOvr,
 	
 	// find the matching kv pair
 	int i; bool isExact;
-	boost::tie(i, isExact) = idx_lower_bound(0, numKVs(), key);
+	tie(i, isExact) = idx_lower_bound(0, numKVs(), key);
 	if(i == numKVs() || ! isExact)
 	{
 		// no existing kv pair! perform insert instead.
@@ -2979,7 +2979,7 @@ dktree_insert(btree_cursor_t* cur, BufferCRef key, BufferCRef value, btree_split
 
 			// - copied DupKeyLeaf/Node
 			Page copy; page_id_t pgidCopy;
-			boost::tie(copy, pgidCopy) = pio->newPage();
+			tie(copy, pgidCopy) = pio->newPage();
 			copy.initHdr(pgidCopy, cur->leaf.pageType());
 			::memcpy(copy.rawbody(), cur->leaf.rawbody(), Page::BODY_SIZE);
 			pio->sync(copy);

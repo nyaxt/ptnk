@@ -8,8 +8,6 @@
 #include <memory>
 #include <string.h>
 
-#include <boost/utility.hpp> // for boost::noncopyable
-
 #include "exceptions.h"
 
 namespace ptnk
@@ -287,7 +285,7 @@ bool bufeq(BufferCRef a, BufferCRef b)
 	return 0 == bufcmp(a, b);
 }
 
-class Buffer : boost::noncopyable
+class Buffer : noncopyable
 {
 public:
 	enum
