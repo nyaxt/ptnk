@@ -994,7 +994,7 @@ TPIO::rebase(bool force)
 		printf("rebase tx start\n");
 #endif
 		boost::lock_guard<boost::mutex> g(m_mtx);
-		boost::scoped_ptr<RebaseTPIOTxSession> tx(new RebaseTPIOTxSession(this));
+		unique_ptr<RebaseTPIOTxSession> tx(new RebaseTPIOTxSession(this));
 		
 		tx->setPgidStartPage(tx->rebaseForceVisit(tx->pgidStartPage()));
 
@@ -1026,7 +1026,7 @@ TPIO::refreshOldPages(page_id_t threshold)
 #ifdef VERBOSE_REFRESH
 		printf("refresh tx start\n");
 #endif
-		boost::scoped_ptr<RefreshTPIOTxSession> tx(new RefreshTPIOTxSession(this));
+		unique_ptr<RefreshTPIOTxSession> tx(new RefreshTPIOTxSession(this));
 
 		Page pgStart(tx->readPage(tx->pgidStartPage()));
 		

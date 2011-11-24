@@ -23,7 +23,7 @@ run_bench()
 		{
 			while(ik < NUM_PREW)
 			{
-				boost::scoped_ptr<DB::Tx> tx(db.newTransaction());
+				unique_ptr<DB::Tx> tx(db.newTransaction());
 
 				for(int j = 0; j < 100; ++ j)
 				{
@@ -45,7 +45,7 @@ run_bench()
 
 		for(int itx = 0; itx < NUM_TX; ++ itx)
 		{
-			boost::scoped_ptr<DB::Tx> tx(db.newTransaction());
+			unique_ptr<DB::Tx> tx(db.newTransaction());
 			
 			for(int iw = 0; iw < NUM_W_PER_TX; ++ iw)
 			{

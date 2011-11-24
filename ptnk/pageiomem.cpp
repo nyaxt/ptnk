@@ -154,7 +154,7 @@ PageIOMem::addMapping(size_t numpages, Mapping* mapold, bool doExpand)
 			PTNK_ASSURE_SYSCALL(::posix_fallocate(m_fd, m_numPagesReserved * PTNK_PAGE_SIZE, allocsize));
 		#else
 			// expand file first
-			boost::scoped_ptr<char> buf(new char[allocsize + PTNK_PAGE_SIZE]);
+			unique_ptr<char> buf(new char[allocsize + PTNK_PAGE_SIZE]);
 			PTNK_ASSURE_SYSCALL(::pwrite(m_fd, buf.get(), allocsize, m_numPagesReserved * PTNK_PAGE_SIZE));
 			PTNK_ASSURE_SYSCALL(::fsync(m_fd));
 		#endif

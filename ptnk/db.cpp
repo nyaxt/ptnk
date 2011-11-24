@@ -68,7 +68,7 @@ DB::initCommon()
 {
 	if(m_pio->needInit())
 	{
-		boost::scoped_ptr<Tx> tx(newTransaction());
+		unique_ptr<Tx> tx(newTransaction());
 
 		OverviewPage pgOvv(tx->pio()->newInitPage<OverviewPage>());
 		tx->pio()->setPgidStartPage(pgOvv.pageId());

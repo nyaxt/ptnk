@@ -47,7 +47,7 @@ struct put_ary_db
 			// puts(buf);
 			for(;;)
 			{
-				boost::scoped_ptr<DB::Tx> tx(db.newTransaction());
+				unique_ptr<DB::Tx> tx(db.newTransaction());
 
 				tx->put(BufferCRef(&k, 4), cstr2ref(buf));
 

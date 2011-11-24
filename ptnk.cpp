@@ -2,6 +2,9 @@
 
 #include <errno.h>
 #include <fcntl.h>
+#include <memory>
+
+using std::unique_ptr;
 
 #define PTNK_READ_BUF_SIZE 4096
 // #define PTNK_LOG_ALL_CAPI
@@ -308,7 +311,7 @@ ptnk_tx_end(ptnk_tx_t* tx, int commit)
 try
 {
 	LOG_OUTF("ptnk_tx_end(tx = %p, commit = %d);\n", tx, commit);
-	std::auto_ptr<ptnk_tx_t> tx_(tx);
+	unique_ptr<ptnk_tx_t> tx_(tx);
 
 	if(commit)
 	{

@@ -51,7 +51,7 @@ MappedFile::createNew(part_id_t partid, const char* filename, ptnk_opts_t opts, 
 		PTNK_ASSURE_SYSCALL(fd = ::open(filename, flags, mode));
 	}
 	
-	std::auto_ptr<MappedFile> mf(new MappedFile(partid, filename, fd, PROT_READ | PROT_WRITE));
+	unique_ptr<MappedFile> mf(new MappedFile(partid, filename, fd, PROT_READ | PROT_WRITE));
 	mf->expandFile(NPAGES_PREALLOC);
 
 	return mf.release();
@@ -92,7 +92,7 @@ MappedFile::openExisting(part_id_t partid, const char* filename, ptnk_opts_t opt
 		PTNK_ASSURE_SYSCALL(fd = ::open(filename, flags));
 	}
 
-	std::auto_ptr<MappedFile> mf(new MappedFile(partid, filename, fd, prot));
+	unique_ptr<MappedFile> mf(new MappedFile(partid, filename, fd, prot));
 
 	size_t pgs = filesize / PTNK_PAGE_SIZE;
 	if(pgs > 0)
@@ -225,7 +225,7 @@ MappedFile::expandFile(size_t pgs)
 		}
 	#else
 		// expand file first
-		boost::scoped_ptr<char> buf(new char[allocsize + PTNK_PAGE_SIZE]);
+		unique_ptr<char> buf(new char[allocsize + PTNK_PAGE_SIZE]);
 		PTNK_ASSURE_SYSCALL(::pwrite(m_fd, buf.get(), allocsize, m_numPagesReserved * PTNK_PAGE_SIZE));
 		PTNK_ASSURE_SYSCALL(::fsync(m_fd));
 	#endif

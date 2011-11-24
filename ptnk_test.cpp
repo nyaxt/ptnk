@@ -344,7 +344,7 @@ TEST(ptnk, buffer_null)
 
 TEST(ptnk, leaf_verybasic)
 {
-	boost::scoped_ptr<PageIO> pio(new PageIOMem);
+	unique_ptr<PageIO> pio(new PageIOMem);
 
 	Leaf l(pio->newInitPage<Leaf>());
 	bool bOvr = false;
@@ -368,7 +368,7 @@ TEST(ptnk, leaf_bulk)
 {
 	const int NUM_KVS = 300;
 
-	boost::scoped_ptr<PageIO> pio(new PageIOMem);
+	unique_ptr<PageIO> pio(new PageIOMem);
 
 	Leaf l(pio->newInitPage<Leaf>());
 	// std::cout << "sizeof Page: " << sizeof(Page) << std::endl;
@@ -452,7 +452,7 @@ TEST(ptnk, leaf_bulk)
 
 TEST(ptnk, leaf_null)
 {
-	boost::scoped_ptr<PageIO> pio(new PageIOMem);
+	unique_ptr<PageIO> pio(new PageIOMem);
 	Leaf l(pio->newInitPage<Leaf>());
 	bool bOvr = false;
 
@@ -481,7 +481,7 @@ TEST(ptnk, leaf_bulk_blobkey)
 		key.get()[i] = static_cast<char>(i);
 	}
 
-	boost::scoped_ptr<PageIO> pio(new PageIOMem);
+	unique_ptr<PageIO> pio(new PageIOMem);
 	Leaf l(pio->newInitPage<Leaf>());
 
 	int i;
@@ -568,7 +568,7 @@ TEST(ptnk, leaf_random)
 			std::swap(ord[x], ord[y]);
 		}
 
-		boost::scoped_ptr<PageIO> pio(new PageIOMem);
+		unique_ptr<PageIO> pio(new PageIOMem);
 
 		Leaf l(pio->newInitPage<Leaf>());
 
@@ -648,7 +648,7 @@ TEST(ptnk, leaf_random)
 
 TEST(ptnk, leaf_corrupt)
 {
-	boost::scoped_ptr<PageIO> pio(new PageIOMem);
+	unique_ptr<PageIO> pio(new PageIOMem);
 	Leaf l(pio->newInitPage<Leaf>());
 
 	btree_split_t split;
@@ -683,7 +683,7 @@ TEST(ptnk, leaf_corrupt)
 
 TEST(ptnk, leaf_dupkey_simple)
 {
-	boost::scoped_ptr<PageIO> pio(new PageIOMem);
+	unique_ptr<PageIO> pio(new PageIOMem);
 
 	Leaf l(pio->newInitPage<Leaf>());
 
@@ -698,7 +698,7 @@ TEST(ptnk, leaf_dupkey_simple)
 
 TEST(ptnk, leaf_dupkey_split)
 {
-	boost::scoped_ptr<PageIO> pio(new PageIOMem);
+	unique_ptr<PageIO> pio(new PageIOMem);
 
 	Leaf l(pio->newInitPage<Leaf>());
 
@@ -790,7 +790,7 @@ TEST(ptnk, leaf_dupkey_split)
 
 TEST(ptnk, leaf_update_nosplit)
 {
-	boost::scoped_ptr<PageIO> pio(new PageIOMem);
+	unique_ptr<PageIO> pio(new PageIOMem);
 	Leaf l(pio->newInitPage<Leaf>());
 
 	int i;
@@ -922,7 +922,7 @@ TEST(ptnk, leaf_update_nosplit)
 
 TEST(ptnk, leaf_del)
 {
-	boost::scoped_ptr<PageIO> pio(new PageIOMem);
+	unique_ptr<PageIO> pio(new PageIOMem);
 	Leaf l(pio->newInitPage<Leaf>());
 
 	int i;
@@ -990,7 +990,7 @@ TEST(ptnk, leaf_del)
 
 TEST(ptnk, leaf_del2)
 {
-	boost::scoped_ptr<PageIO> pio(new PageIOMem);
+	unique_ptr<PageIO> pio(new PageIOMem);
 	Leaf l(pio->newInitPage<Leaf>());
 
 	int i;
@@ -1061,7 +1061,7 @@ TEST(ptnk, leaf_query)
 {
 	const int NUM_KVS = 300;
 
-	boost::scoped_ptr<PageIO> pio(new PageIOMem);
+	unique_ptr<PageIO> pio(new PageIOMem);
 
 	Leaf l(pio->newInitPage<Leaf>());
 	// l.dump();
@@ -1195,7 +1195,7 @@ TEST(ptnk, leaf_query)
 
 TEST(ptnk, leaf_query_torture)
 {
-	boost::scoped_ptr<PageIO> pio(new PageIOMem);
+	unique_ptr<PageIO> pio(new PageIOMem);
 
 	Leaf l(pio->newInitPage<Leaf>());
 
@@ -1446,7 +1446,7 @@ TEST(ptnk, leaf_query_torture)
 
 TEST(ptnk, leaf_cursor_put_basic)
 {
-	boost::scoped_ptr<PageIO> pio(new PageIOMem);
+	unique_ptr<PageIO> pio(new PageIOMem);
 
 	Leaf l(pio->newInitPage<Leaf>());
 
@@ -1482,7 +1482,7 @@ TEST(ptnk, leaf_cursor_put_basic)
 // #define DUMP_NODE_SPLIT
 TEST(ptnk, node_bulk)
 {
-	boost::scoped_ptr<PageIO> pio(new PageIOMem);
+	unique_ptr<PageIO> pio(new PageIOMem);
 
 	Node n(pio->newInitPage<Node>());
 	n.initBody(0);
@@ -1553,7 +1553,7 @@ TEST(ptnk, node_bulk)
 
 TEST(ptnk, node_null)
 {
-	boost::scoped_ptr<PageIO> pio(new PageIOMem);
+	unique_ptr<PageIO> pio(new PageIOMem);
 
 	Node n(pio->newInitPage<Node>());
 	n.initBody(0);
@@ -1615,7 +1615,7 @@ TEST(ptnk, node_random)
 	const int COUNT = 2000;
 	for(int c = 0; c < 10; ++ c)
 	{
-		boost::scoped_ptr<PageIO> pio(new PageIOMem);
+		unique_ptr<PageIO> pio(new PageIOMem);
 
 		SETUP_ORD(COUNT);
 
@@ -1705,7 +1705,7 @@ TEST(ptnk, node_random)
 
 TEST(ptnk, node_del)
 {
-	boost::scoped_ptr<PageIO> pio(new PageIOMem);
+	unique_ptr<PageIO> pio(new PageIOMem);
 
 	Node n(pio->newInitPage<Node>());
 	n.initBody(0);
@@ -1768,7 +1768,7 @@ TEST(ptnk, node_del)
 
 TEST(ptnk, node_del_first)
 {
-	boost::scoped_ptr<PageIO> pio(new PageIOMem);
+	unique_ptr<PageIO> pio(new PageIOMem);
 
 	Node n(pio->newInitPage<Node>());
 	n.initBody(0);
@@ -1831,7 +1831,7 @@ TEST(ptnk, node_del_first)
 
 TEST(ptnk, node_del_only)
 {
-	boost::scoped_ptr<PageIO> pio(new PageIOMem);
+	unique_ptr<PageIO> pio(new PageIOMem);
 
 	Node n(pio->newInitPage<Node>());
 	n.initBody(0);
@@ -1846,7 +1846,7 @@ TEST(ptnk, node_del_only)
 
 TEST(ptnk, node_query)
 {
-	boost::scoped_ptr<PageIO> pio(new PageIOMem);
+	unique_ptr<PageIO> pio(new PageIOMem);
 
 	Node n(pio->newInitPage<Node>());
 	n.initBody(0);
@@ -1939,7 +1939,7 @@ TEST(ptnk, node_query)
 
 TEST(ptnk, btree_basic)
 {
-	boost::scoped_ptr<PageIO> pio(new PageIOMem);
+	unique_ptr<PageIO> pio(new PageIOMem);
 	
 	page_id_t idRoot = btree_init(pio.get());
 
@@ -1964,7 +1964,7 @@ TEST(ptnk, btree_basic)
 
 TEST(ptnk, btree_cursor_get_first)
 {
-	boost::scoped_ptr<PageIO> pio(new PageIOMem);
+	unique_ptr<PageIO> pio(new PageIOMem);
 	
 	page_id_t idRoot = btree_init(pio.get());
 
@@ -1986,7 +1986,7 @@ TEST(ptnk, btree_cursor_get_first)
 
 TEST(ptnk, btree_cursor_nextprev)
 {
-	boost::scoped_ptr<PageIO> pio(new PageIOMem);
+	unique_ptr<PageIO> pio(new PageIOMem);
 	
 	page_id_t idRoot = btree_init(pio.get());
 
@@ -2042,7 +2042,7 @@ TEST(ptnk, btree_cursor_nextprev)
 
 TEST(ptnk, dupkey_tree_10k)
 {
-	boost::scoped_ptr<PageIO> pio(new PageIOMem);
+	unique_ptr<PageIO> pio(new PageIOMem);
 
 	page_id_t idRoot = btree_init(pio.get());
 
@@ -2088,7 +2088,7 @@ TEST(ptnk, dupkey_tree_10k)
 
 TEST(ptnk, dupkey_tree_massive)
 {
-	boost::scoped_ptr<PageIO> pio(new PageIOMem);
+	unique_ptr<PageIO> pio(new PageIOMem);
 
 	page_id_t idRoot = btree_init(pio.get());
 
@@ -2138,7 +2138,7 @@ TEST(ptnk, dupkey_tree_massive)
 
 TEST(ptnk, btree_many_dupkeys)
 {
-	boost::scoped_ptr<PageIO> pio(new PageIOMem);
+	unique_ptr<PageIO> pio(new PageIOMem);
 	
 	page_id_t idRoot = btree_init(pio.get());
 	
@@ -2222,7 +2222,7 @@ TEST(ptnk, btree_many_dupkeys)
 
 TEST(ptnk, dktree_nonexact_put_after)
 {
-	boost::scoped_ptr<PageIO> pio(new PageIOMem);
+	unique_ptr<PageIO> pio(new PageIOMem);
 	
 	page_id_t idRoot = btree_init(pio.get());
 	
@@ -2250,7 +2250,7 @@ TEST(ptnk, dktree_nonexact_put_after)
 
 TEST(ptnk, btree_cursor_put)
 {
-	boost::scoped_ptr<PageIO> pio(new PageIOMem);
+	unique_ptr<PageIO> pio(new PageIOMem);
 
 	page_id_t idRoot = btree_init(pio.get());
 
@@ -2314,7 +2314,7 @@ TEST(ptnk, btree_cursor_put)
 
 TEST(ptnk, btree_nonexact_query)
 {
-	boost::scoped_ptr<PageIO> pio(new PageIOMem);
+	unique_ptr<PageIO> pio(new PageIOMem);
 
 	page_id_t idRoot = btree_init(pio.get());
 
@@ -2351,7 +2351,7 @@ TEST(ptnk, btree_nonexact_query)
 
 TEST(ptnk, OverviewPage)
 {
-	boost::scoped_ptr<PageIO> pio(new PageIOMem);
+	unique_ptr<PageIO> pio(new PageIOMem);
 	OverviewPage ovv(pio->newInitPage<OverviewPage>());
 	
 	bool bOvr = false;
@@ -2391,7 +2391,7 @@ TEST(ptnk, OverviewPage)
 
 TEST(ptnk, btree_cursor_del)
 {
-	boost::scoped_ptr<PageIO> pio(new PageIOMem);
+	unique_ptr<PageIO> pio(new PageIOMem);
 
 	page_id_t idRoot = btree_init(pio.get());
 
@@ -2468,7 +2468,7 @@ TEST(ptnk, btree_cursor_del)
 
 TEST(ptnk, btree_cursor_del_wholeleaf)
 {
-	boost::scoped_ptr<PageIO> pio(new PageIOMem);
+	unique_ptr<PageIO> pio(new PageIOMem);
 
 	page_id_t idRoot = btree_init(pio.get());
 
@@ -2578,7 +2578,7 @@ TEST(ptnk, btree_cursor_del_wholeleaf)
 
 TEST(ptnk, OverviewPage_cache)
 {
-	boost::scoped_ptr<PageIO> pio(new PageIOMem);
+	unique_ptr<PageIO> pio(new PageIOMem);
 	OverviewPage ovv(pio->newInitPage<OverviewPage>());
 	
 	bool bOvr = false;
@@ -2908,7 +2908,7 @@ TEST(ptnk, tx_single_key_put_get)
 	BufferCRef value_put("one", 4);
 
 	{
-		boost::scoped_ptr<DB::Tx> tx(db.newTransaction());
+		unique_ptr<DB::Tx> tx(db.newTransaction());
 		tx->put(cstr2ref("1"), value_put);
 
 		{
@@ -3078,7 +3078,7 @@ TEST(ptnk, random_keys_put_get)
 
 	if(0)
 	{
-		boost::scoped_ptr<DB::Tx> tx(db.newTransaction());
+		unique_ptr<DB::Tx> tx(db.newTransaction());
 		std::cout << "pgidstart: " << tx->pio()->pgidStartPage() << std::endl;;
 	}
 
@@ -3099,7 +3099,7 @@ TEST(ptnk, random_keys_put_get)
 	}
 
 	{
-		boost::scoped_ptr<DB::Tx> tx(db.newTransaction());
+		unique_ptr<DB::Tx> tx(db.newTransaction());
 		tx->put_k32u(50, cstr2ref("asjdkfljfdsa"));
 		// db.dumpStat();
 		// tx->dumpStat();
@@ -3117,7 +3117,7 @@ TEST(ptnk, rebase_test)
 		db.put_k32u(i, cstr2ref(g_test_strs[i]));
 	}
 	{
-		boost::scoped_ptr<DB::Tx> tx(db.newTransaction());
+		unique_ptr<DB::Tx> tx(db.newTransaction());
 		tx->put_k32u(9, cstr2ref(g_test_strs[9]));
 		// tx->dumpStat();
 		EXPECT_TRUE(tx->tryCommit());
@@ -3155,7 +3155,7 @@ TEST(ptnk, rebase_test)
 	for(int i = 0; i < 10; ++ i)
 	{
 		{
-			boost::scoped_ptr<DB::Tx> tx(db.newTransaction());
+			unique_ptr<DB::Tx> tx(db.newTransaction());
 			tx->get_k32u(i, &value_get);
 			// tx->dumpStat();
 			EXPECT_EQ(0U, tx->pio()->stat().nReadOvr) << "number of read ovr should be 0 after rebase";
@@ -3173,7 +3173,7 @@ TEST(ptnk, rebase_test)
 			char buf[8];
 			sprintf(buf, "%u", i);
 
-			boost::scoped_ptr<DB::Tx> tx(db.newTransaction());
+			unique_ptr<DB::Tx> tx(db.newTransaction());
 			tx->put_k32u(i, cstr2ref(buf));
 			EXPECT_TRUE(tx->tryCommit());
 		}
@@ -3182,7 +3182,7 @@ TEST(ptnk, rebase_test)
 	for(int i = 0; i < 10; ++ i)
 	{
 		{
-			boost::scoped_ptr<DB::Tx> tx(db.newTransaction());
+			unique_ptr<DB::Tx> tx(db.newTransaction());
 			tx->get_k32u(i, &value_get);
 			// tx->dumpStat();
 		}
@@ -3194,7 +3194,7 @@ TEST(ptnk, rebase_test)
 	}
 
 	{
-		boost::scoped_ptr<DB::Tx> tx(db.newTransaction());
+		unique_ptr<DB::Tx> tx(db.newTransaction());
 		for(int i = 10; i < 20; ++i)
 		{
 			char buf[8], buf2[8];
@@ -3216,7 +3216,7 @@ TEST(ptnk, rebase_test)
 	for(int i = 0; i < 10; ++ i)
 	{
 		{
-			boost::scoped_ptr<DB::Tx> tx(db.newTransaction());
+			unique_ptr<DB::Tx> tx(db.newTransaction());
 			tx->get_k32u(i, &value_get);
 			// tx->dumpStat();
 		}
@@ -3228,7 +3228,7 @@ TEST(ptnk, rebase_test)
 	}
 
 	{
-		boost::scoped_ptr<DB::Tx> tx(db.newTransaction());
+		unique_ptr<DB::Tx> tx(db.newTransaction());
 		for(int i = 10; i < 20; ++i)
 		{
 			char buf[8], buf2[8];
@@ -3261,7 +3261,7 @@ TEST(ptnk, single_big_tx)
 	}
 
 	{
-		boost::scoped_ptr<DB::Tx> tx(db.newTransaction());
+		unique_ptr<DB::Tx> tx(db.newTransaction());
 		for(int j = 0; j < NUM_KEYS; ++ j)
 		{
 			int i = ord[j];
@@ -3308,7 +3308,7 @@ TEST(ptnk, rebase_multiple)
 	for(int i = 0; i < NUM_KEYS; ++ i)
 	{
 		{
-			boost::scoped_ptr<DB::Tx> tx(db.newTransaction());
+			unique_ptr<DB::Tx> tx(db.newTransaction());
 
 			// make sure that keys [0..i-1] are readable
 			for(int j = 0; j < i; ++ j)
@@ -3427,7 +3427,7 @@ TEST(ptnk, DISABLED_million_key_put_get)
 
 	for(int i = 0; i < NUM_KEYS;)
 	{
-		boost::scoped_ptr<DB::Tx> tx(db.newTransaction());
+		unique_ptr<DB::Tx> tx(db.newTransaction());
 		
 		for(int j = 0; j < 100000; ++ j)
 		{
@@ -3469,7 +3469,7 @@ TEST(ptnk, save_load)
 
 		for(int i = 0; i < NUM_KEYS;)
 		{
-			boost::scoped_ptr<DB::Tx> tx(db.newTransaction());
+			unique_ptr<DB::Tx> tx(db.newTransaction());
 				
 			for(int j = 0; j < (NUM_KEYS/10); ++ j, ++ i)
 			{
@@ -3491,7 +3491,7 @@ TEST(ptnk, save_load)
 		db.dumpStat();
 		// db.dumpAll();
 
-		boost::scoped_ptr<DB::Tx> tx(db.newTransaction());
+		unique_ptr<DB::Tx> tx(db.newTransaction());
 
 		Buffer v;
 		for(int i = 0; i < NUM_KEYS; ++ i)
@@ -3527,7 +3527,7 @@ TEST(ptnk, save_load)
 TEST(ptnk, CompMap)
 {
 	std::vector<local_pgid_t> marked;
-	boost::scoped_ptr<PageIO> pio(new PageIOMem);
+	unique_ptr<PageIO> pio(new PageIOMem);
 
 	const uint64_t numOrigPages = 100000;
 	CompMap cm;
@@ -3559,7 +3559,7 @@ TEST(ptnk, multitable)
 	Buffer v;
 
 	{
-		boost::scoped_ptr<DB::Tx> tx(db.newTransaction());
+		unique_ptr<DB::Tx> tx(db.newTransaction());
 
 		tx->put(cstr2ref("a"), cstr2ref("default_val"));
 
@@ -3579,7 +3579,7 @@ TEST(ptnk, multitable)
 
 	// check
 	{
-		boost::scoped_ptr<DB::Tx> tx(db.newTransaction());
+		unique_ptr<DB::Tx> tx(db.newTransaction());
 
 		tx->get(cstr2ref("default"), cstr2ref("a"), &v);
 		ASSERT_TRUE(v.isValid());
@@ -3648,7 +3648,7 @@ TEST(ptnk, PartitionedPageIO_singlepart)
 
 		for(int i = 0; i < NUM_KEYS;)
 		{
-			boost::scoped_ptr<DB::Tx> tx(db.newTransaction());
+			unique_ptr<DB::Tx> tx(db.newTransaction());
 				
 			for(int j = 0; j < (NUM_KEYS/10); ++ j, ++ i)
 			{
@@ -3670,7 +3670,7 @@ TEST(ptnk, PartitionedPageIO_singlepart)
 		// db.dumpStat();
 		// db.dumpAll();
 
-		boost::scoped_ptr<DB::Tx> tx(db.newTransaction());
+		unique_ptr<DB::Tx> tx(db.newTransaction());
 
 		Buffer v;
 		for(int i = 0; i < NUM_KEYS; ++ i)
@@ -3702,7 +3702,7 @@ TEST(ptnk, PartitionedPageIO_newpart)
 		{
 			for(int j = 0; j < (NUM_KEYS/10); ++ j, ++ i)
 			{
-				boost::scoped_ptr<DB::Tx> tx(db.newTransaction());
+				unique_ptr<DB::Tx> tx(db.newTransaction());
 				char buf[8];
 				sprintf(buf, "%u", i);
 				tx->put_k32u(i, cstr2ref(buf));
@@ -3721,7 +3721,7 @@ TEST(ptnk, PartitionedPageIO_newpart)
 		// db.dumpStat();
 		// db.dumpAll();
 
-		boost::scoped_ptr<DB::Tx> tx(db.newTransaction());
+		unique_ptr<DB::Tx> tx(db.newTransaction());
 
 		Buffer v;
 		for(int i = 0; i < NUM_KEYS; ++ i)
@@ -3759,7 +3759,7 @@ struct alloc_pg
 
 TEST(ptnk, PageIOMem_multithread)
 {
-	boost::scoped_ptr<PageIO> pio(new PageIOMem);
+	unique_ptr<PageIO> pio(new PageIOMem);
 	
 	const int NUM_THREAD = 10;
 	const size_t PG_PER_THREAD = 10000;
@@ -3792,7 +3792,7 @@ TEST(ptnk, PageIOMem_multithread)
 TEST(ptnk, PartitionedPageIO_multithread)
 {
 	t_mktmpdir("./_testtmp");
-	boost::scoped_ptr<PageIO> pio(new PartitionedPageIO("./_testtmp/mt", OWRITER | OCREATE | OTRUNCATE));
+	unique_ptr<PageIO> pio(new PartitionedPageIO("./_testtmp/mt", OWRITER | OCREATE | OTRUNCATE));
 	
 	const int NUM_THREAD = 10;
 	const size_t PG_PER_THREAD = 10000;
@@ -3833,7 +3833,7 @@ TEST(ptnk, commit_fail_over_rebase)
 	}
 
 	{
-		boost::scoped_ptr<DB::Tx> tx(db.newTransaction());
+		unique_ptr<DB::Tx> tx(db.newTransaction());
 
 		tx->put_k32u(11, cstr2ref("test"));
 
@@ -3864,7 +3864,7 @@ struct put_ary_db
 
 			for(;;)
 			{
-				boost::scoped_ptr<DB::Tx> tx(db.newTransaction());
+				unique_ptr<DB::Tx> tx(db.newTransaction());
 
 				tx->put_k32u(k, cstr2ref(buf));
 
