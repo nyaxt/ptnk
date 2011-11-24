@@ -156,6 +156,7 @@ def build(bld):
 		use = 'TCMALLOC PTHREAD BOOST_THREAD',
 		source = '''
 		ptnk/hash.cpp
+		ptnk/exceptions.cpp
 		ptnk/sysutils.cpp
 		ptnk/buffer.cpp
 		ptnk/page.cpp
@@ -166,7 +167,6 @@ def build(bld):
 		ptnk/compmap.cpp
 		ptnk/pol.cpp
 		ptnk/stm.cpp
-		ptnk/tpio.cpp
 		ptnk/tpio2.cpp
 		ptnk/overview.cpp
 		ptnk/helperthr.cpp

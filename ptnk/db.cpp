@@ -7,7 +7,6 @@
 #include "pageiomem.h"
 #include "partitionedpageio.h"
 #include "btree.h"
-#include "tpio.h"
 #include "tpio2.h"
 #include "overview.h"
 #include "helperthr.h"

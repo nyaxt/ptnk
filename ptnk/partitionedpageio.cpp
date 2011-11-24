@@ -3,6 +3,8 @@
 #include "helperthr.h"
 #include "sysutils.h"
 
+#include <sstream>
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <fcntl.h>
@@ -13,7 +15,6 @@
 #include <sys/types.h>
 #include <libgen.h>
 
-#include <boost/foreach.hpp>
 #include <boost/tuple/tuple.hpp>
 
 // #define VERBOSE_PAGEIO
@@ -37,7 +38,9 @@ MappedFile::createNew(part_id_t partid, const char* filename, ptnk_opts_t opts, 
 {
 	if(!(opts & OTRUNCATE) && file_exists(filename))
 	{
-		PTNK_THROW_RUNTIME_ERR((boost::format("file %1% already exists (and OTRUNCATE not specified)") % filename).str());
+		std::stringstream err;
+		err << "file " << filename << " already exists (and OTRUNCATE not specified)";;
+		PTNK_THROW_RUNTIME_ERR(err.str());
 	}
 
 	PTNK_CHECK((opts & OWRITER) && (opts & OCREATE));
@@ -298,7 +301,9 @@ MappedFile::makeReadOnly()
 void
 MappedFile::dump(std::ostream& o) const
 {
-	o << "- partition id: " << (boost::format("%03x") % partid()) << std::endl;	
+	o << std::setfill('0');
+	o << "- partition id: " << std::hex << std::setw(3) << partid() << std::dec << std::endl;	
+	o << std::setfill(' ');
 	o << "  filename: " << m_filename << std::endl;	
 
 	const Mapping* m = &m_mapFirst;
@@ -379,10 +384,9 @@ PartitionedPageIO::drop(const char* dbprefix)
 {
 	Vpartfile_t files; scanFiles(&files, dbprefix);
 
-	std::string filepath; part_id_t _;
-	BOOST_FOREACH(tie(filepath, _), files)
+	for(auto fp_partid: files)
 	{
-		PTNK_ASSURE_SYSCALL(::unlink(filepath.c_str()));
+		PTNK_ASSURE_SYSCALL(::unlink(fp_partid.first.c_str()));
 	}
 }
 
@@ -473,9 +477,11 @@ PartitionedPageIO::openFiles()
 	Vpartfile_t files; scanFiles(&files, m_dbprefix.c_str());
 
 	m_partidFirst = PTNK_PARTID_INVALID;
-	std::string filepath; part_id_t partid;
-	BOOST_FOREACH(tie(filepath, partid), files)
+	for(const auto& fp_partid: files)
 	{
+		const std::string& filepath = fp_partid.first;
+		const part_id_t partid = fp_partid.second;
+
 		if(m_opts & OTRUNCATE)
 		{
 			std::cout << "  O_TRUNCATE has been specified. deleting: " << filepath << std::endl;

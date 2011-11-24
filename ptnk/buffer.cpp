@@ -1,6 +1,7 @@
 #include "buffer.h"
 
-#include <boost/lexical_cast.hpp>
+#include <sstream>
+#include <iomanip>
 
 int
 ptnk_memcmp(const void* a, const void* b, size_t s)
@@ -27,17 +28,15 @@ BufferCRef::inspect() const
 	}
 	else 
 	{
-		std::string ret;
+		std::stringstream ret;
 		if(size() == 1)
 		{
-			ret.append(boost::lexical_cast<std::string>((int)*(const uint8_t*)get()));
-			ret.append("I: ");
+			ret << static_cast<int>(*reinterpret_cast<const uint8_t*>(get())) << "I: ";
 		} 
 		else if(size() == 4)
 		{
 			uint32_t i = __builtin_bswap32(*(const uint32_t*)get());
-			ret.append(boost::lexical_cast<std::string>(i));
-			ret.append("I: ");
+			ret << i << "I: ";
 		}
 
 		for(ssize_t i = 0; i < size(); ++ i)
@@ -45,7 +44,7 @@ BufferCRef::inspect() const
 			char c = *(get() + i);
 			if(isprint(c))
 			{
-				ret.push_back(c);
+				ret << c;
 			}
 			else
 			{
@@ -53,7 +52,7 @@ BufferCRef::inspect() const
 			}
 		}
 
-		return ret;
+		return ret.str();
 	}
 }
 
@@ -71,10 +70,11 @@ BufferCRef::hexdump() const
 	else 
 	{
 		std::stringstream out;
+		out << std::setfill('0'); // this interface really sucks!!!
 
 		for(ssize_t i = 0; i < size(); ++ i)
 		{
-			out << (boost::format("%02x") % (int)(uint8_t)get()[i]);
+			out << std::setw(2) << std::hex << static_cast<unsigned int>(get()[i]);
 			if(i % 4 == 3)
 			{
 				out << ' ';	

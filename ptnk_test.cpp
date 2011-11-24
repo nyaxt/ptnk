@@ -10,7 +10,6 @@
 #include "ptnk/btree.h"
 #include "ptnk/btree_int.h"
 #include "ptnk/overview.h"
-#include "ptnk/tpio.h"
 #include "ptnk/tpio2.h"
 #include "ptnk/sysutils.h"
 
@@ -2651,73 +2650,6 @@ TEST(ptnk, OverviewPage_cache)
 	} \
 	});
 
-TEST(ptnk, overridesv)
-{
-	OverridesV ovrs;
-
-	EXPECT_EQ((page_id_t)3, ovrs.find(3));
-
-	ovrs.add(1, 2);
-	EXPECT_EQ((page_id_t)3, ovrs.find(3));
-	EXPECT_EQ((page_id_t)2, ovrs.find(2));
-	EXPECT_EQ((page_id_t)2, ovrs.find(1));
-
-	ovrs.add(4, 5);
-	EXPECT_EQ((page_id_t)3, ovrs.find(3));
-	EXPECT_EQ((page_id_t)2, ovrs.find(2));
-	EXPECT_EQ((page_id_t)2, ovrs.find(1));
-	EXPECT_EQ((page_id_t)5, ovrs.find(4));
-
-	ovrs.add(1, 3);
-	EXPECT_EQ((page_id_t)3, ovrs.find(1));
-}
-
-TEST(ptnk, OverridesCB_getSpaceLeft)
-{
-	OverridesCB ocb;
-
-	OverridesCB::hint_t hint = ocb.getHint();
-	EXPECT_EQ(OverridesCB::BUF_SIZE - 1, ocb.getSpaceLeft(1, hint));
-
-	{
-		OverridesV ovrs;
-		ovrs.add(1, 2);
-		ovrs.add(2, 3);
-		ovrs.add(3, 4);
-		
-		EXPECT_TRUE(ocb.checkConflict(ovrs, 1, 1, hint));
-		ocb.merge(ovrs, 1, 2);
-	}
-	EXPECT_EQ(OverridesCB::BUF_SIZE - 1 - 3, ocb.getSpaceLeft(1, hint));
-	
-	hint = ocb.getHint();
-	{
-		OverridesV ovrs;
-		for(int i = 0; i < OverridesCB::BUF_SIZE / 2; ++ i)
-		{
-			ovrs.add(i+3, i+4);	
-		}
-
-		EXPECT_TRUE(ocb.checkConflict(ovrs, 2, 2, hint));
-		ocb.merge(ovrs, 2, 3);
-	}
-	EXPECT_EQ(OverridesCB::BUF_SIZE - 1 - OverridesCB::BUF_SIZE/2, ocb.getSpaceLeft(1, hint));
-
-	hint = ocb.getHint();
-	{
-		OverridesV ovrs;
-		for(int i = 0; i < OverridesCB::BUF_SIZE / 2; ++ i)
-		{
-			ovrs.add(i+100000, i+100001);	
-		}
-
-		EXPECT_TRUE(ocb.checkConflict(ovrs, 3, 3, hint));
-		ocb.merge(ovrs, 3, 4);
-	}
-	EXPECT_EQ(-1, ocb.getSpaceLeft(1, hint));
-	EXPECT_EQ(OverridesCB::BUF_SIZE - 1 - OverridesCB::BUF_SIZE/2, ocb.getSpaceLeft(4, hint));
-}
-
 TEST(ptnk, TPIO2_basic)
 {
 	shared_ptr<PageIO> pio(new PageIOMem);
@@ -3763,7 +3695,7 @@ TEST(ptnk, PageIOMem_multithread)
 	const size_t PG_PER_THREAD = 10000;
 	const size_t c = NUM_THREAD * PG_PER_THREAD;
 
-	boost::scoped_array<page_id_t> check(new page_id_t[c]);
+	std::vector<page_id_t> check(c);
 	boost::thread_group tg;
 	for(int i = 0; i < NUM_THREAD; ++ i)
 	{
@@ -3780,7 +3712,7 @@ TEST(ptnk, PageIOMem_multithread)
 	::fclose(f);
 #endif
 
-	std::sort(&check[0], &check[c]);
+	std::sort(check.begin(), check.end());
 	for(unsigned int i = 1; i < c; ++ i)
 	{
 		EXPECT_NE(check[i-1], check[i]);
@@ -3796,7 +3728,7 @@ TEST(ptnk, PartitionedPageIO_multithread)
 	const size_t PG_PER_THREAD = 10000;
 	const size_t c = NUM_THREAD * PG_PER_THREAD;
 
-	boost::scoped_array<page_id_t> check(new page_id_t[c]);
+	std::vector<page_id_t> check(c);
 	boost::thread_group tg;
 	for(int i = 0; i < NUM_THREAD; ++ i)
 	{
@@ -3813,7 +3745,7 @@ TEST(ptnk, PartitionedPageIO_multithread)
 	::fclose(f);
 #endif
 
-	std::sort(&check[0], &check[c]);
+	std::sort(check.begin(), check.end());
 	for(unsigned int i = 1; i < c; ++ i)
 	{
 		EXPECT_NE(check[i-1], check[i]);

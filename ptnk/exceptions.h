@@ -1,13 +1,13 @@
 #ifndef _ptnk_exceptions_h_
 #define _ptnk_exceptions_h_
 
-#include <string.h> // for strerror
-
 #include <stdexcept>
-#include <boost/format.hpp>
 
 namespace ptnk
 {
+
+std::string format_filelinewhat(const char* file, int line, const std::string& what);
+std::string format_filelinesyscallerrn(const char* file, int line, const std::string& syscall_name, int errn);
 
 class ptnk_runtime_error : public std::runtime_error
 {
@@ -16,8 +16,8 @@ public:
 	: std::runtime_error(what)
 	{ /* NOP */ }
 
-	explicit ptnk_runtime_error(const char* file, int line, const std::string& what)
-	: std::runtime_error((boost::format("%1%:%2% %3%") % file % line % what).str())
+	ptnk_runtime_error(const char* file, int line, const std::string& what)
+	: std::runtime_error(format_filelinewhat(file, line, what))
 	{ /* NOP */ }
 };
 #define PTNK_THROW_RUNTIME_ERR(x) throw ptnk_runtime_error(__FILE__, __LINE__, x);
@@ -25,8 +25,8 @@ public:
 class ptnk_logic_error : public std::logic_error 
 {
 public:
-	explicit ptnk_logic_error(const char* file, int line, const std::string& what)
-	: std::logic_error((boost::format("%1%:%2% %3%") % file % line % what).str())
+	ptnk_logic_error(const char* file, int line, const std::string& what)
+	: std::logic_error(format_filelinewhat(file, line, what))
 	{ /* NOP */ }
 };
 #define PTNK_THROW_LOGIC_ERR(x) throw ptnk_logic_error(__FILE__, __LINE__, x);
@@ -34,8 +34,8 @@ public:
 class ptnk_syscall_error : public ptnk_runtime_error
 {
 public: 
-	explicit ptnk_syscall_error(const char* file, int line, const std::string& syscall_name, int errn)
-	: ptnk_runtime_error((boost::format("%1%:%2% %3% errno: %4% errdesc: %5%") % file % line % syscall_name % errn % strerror(errn)).str())
+	ptnk_syscall_error(const char* file, int line, const std::string& syscall_name, int errn)
+	: ptnk_runtime_error(format_filelinesyscallerrn(file, line, syscall_name, errn))
 	{ /* NOP */ }
 };
 #define PTNK_ASSURE_SYSCALL(x) for(;(x) < 0; throw ptnk::ptnk_syscall_error(__FILE__, __LINE__, #x, errno))
