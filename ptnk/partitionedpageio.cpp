@@ -591,8 +591,9 @@ PartitionedPageIO::expandTo(page_id_t pgid)
 		{
 			// need new partition
 			
-			PTNK_ASSERT(partid-1 == m_partidLast);
+			PTNK_CHECK(partid-1 == m_partidLast);
 			addNewPartition_unsafe();
+			continue;
 		}
 
 		ssize_t numNeeded = PGID_LOCALID(pgid) - part->numPagesReserved() + 1;
