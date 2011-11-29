@@ -53,18 +53,20 @@ run_bench()
 				b.Put(Slice(buf, 8), Slice((char*)&k, sizeof(k)));
 			}
 
-#if 0
 			for(int ir = 0; ir < NUM_R_PER_TX; ++ ir)
 			{
+				leveldb::ReadOptions options;
+				options.snapshot = db->GetSnapshot();
+
 				int k = keys[rand() % ik];
 				char buf[9];
 				sprintf(buf, "%08u", k);
 
-				char v[9];
+				std::string value;
+				db->Get(options, Slice(buf, 8), &value);
 
-				// .get(buf, 8, v, 9);
+				db->ReleaseSnapshot(options.snapshot);
 			}
-#endif
 
 			db->Write(wopt, &b);
 		}
