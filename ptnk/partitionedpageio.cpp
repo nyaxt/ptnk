@@ -117,7 +117,24 @@ MappedFile::MappedFile(part_id_t partid, const char* filename, int fd, int prot)
 
 MappedFile::~MappedFile()
 {
-	/* NOP */
+	// unmap mmap(2)s
+	page_id_t prevEnd = 0;
+	for(Mapping* m = &m_mapFirst; m; m = m->next.get())
+	{
+		if(m->offset)
+		{
+			size_t len = (m->pgidEnd - prevEnd) * PTNK_PAGE_SIZE;
+			::munmap(m->offset, len);
+		}
+
+		prevEnd = m->pgidEnd;
+	}
+	
+	// close file
+	if(m_fd > 0)
+	{
+		::close(m_fd);	
+	}
 }
 
 MappedFile::Mapping*
