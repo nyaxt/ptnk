@@ -135,7 +135,14 @@ public:
 	void dump(std::ostream& s) const;
 
 	unique_ptr<TPIO2TxSession> newTransaction();
-	bool tryCommit(TPIO2TxSession* tx);
+
+	enum commit_flags_t
+	{
+		COMMIT_DEFAULT = 0,
+		COMMIT_REFRESH = 1,	
+	};
+
+	bool tryCommit(TPIO2TxSession* tx, commit_flags_t flags = COMMIT_DEFAULT);
 
 	void rebase(bool force);
 	void refreshOldPages(page_id_t threshold);
@@ -182,6 +189,9 @@ private:
 
 	//! true if rebase is being done (further tx are cancelled)
 	bool m_bDuringRebase;
+
+	//! true if refresh is being done
+	bool m_bDuringRefresh;
 
 	boost::mutex m_mtxRebase;
 	boost::condition_variable m_condRebase;

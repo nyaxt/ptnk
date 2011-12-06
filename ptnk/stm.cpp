@@ -104,8 +104,17 @@ LocalOvr::addOvr(page_id_t pgidOrig, page_id_t pgidOvr)
 bool
 LocalOvr::checkConflict(LocalOvr* other)
 {
-	if(other->m_pgidStartPage != m_pgidStartPageOrig) return false;
-	if(! other->m_bfOvrs.mayContain(m_bfOvrs)) return false;
+	if(other->m_pgidStartPage != m_pgidStartPageOrig)
+	{
+		std::cerr << "aborting conflict check as start pg is different" << std::endl;
+		return false;
+	}
+
+	if(! other->m_bfOvrs.mayContain(m_bfOvrs))
+	{
+		// a bloomfilter ensures that there are no conflict.
+		return false;
+	}
 	
 	const int iE = m_pgidOrigs.size();
 	const int jE = other->m_pgidOrigs.size();
@@ -131,6 +140,24 @@ LocalOvr::checkConflict(LocalOvr* other)
 	}
 
 	return false;
+}
+
+void
+LocalOvr::filterConflict(LocalOvr* other)
+{
+	if(other->m_pgidStartPage != m_pgidStartPageOrig)
+	{
+		std::cerr << "aborting conflict check as start pg is different" << std::endl;
+		return;
+	}
+
+	if(! other->m_bfOvrs.mayContain(m_bfOvrs))
+	{
+		// a bloomfilter ensures that there are no conflict.
+		return;
+	}
+	
+	PTNK_THROW_LOGIC_ERR("FIXME: not yet impl.");
 }
 
 void
@@ -362,6 +389,63 @@ ActiveOvr::tryCommit(unique_ptr<LocalOvr>& plovr, ver_t verW)
 	return verW;
 }
 
+ver_t
+ActiveOvr::tryCommitRefresh(unique_ptr<LocalOvr>& plovr)
+{
+	LocalOvr* lovr = plovr.get();
+
+	// step 1: remove ovr entries from _lovr_ which conflict with other txs and add _lovr_ to validated ovrs list
+	ver_t verW = TXID_INVALID;
+	{
+		LocalOvr* lovrVerified = NULL;
+
+		for(;;)
+		{
+			LocalOvr* lovrPrev = m_lovrVerifiedTip;
+
+			// tx may not committed after terminator
+			if(lovrPrev && lovrPrev->m_bTerminator) return PGID_INVALID;
+
+			lovr->m_prev = lovrPrev;
+			lovr->m_verWrite = (lovrPrev ? lovrPrev->m_verWrite : m_verBase) + 1;
+			__sync_synchronize(); // lovr->m_prev must be set BEFORE tip ptr CAS swing below
+
+			// check conflict with txs committed after read snapshot
+			for(LocalOvr* lovrBefore = lovrPrev; lovrBefore && lovrBefore != lovrVerified; lovrBefore = lovrBefore->m_prev)
+			{
+				if(lovr->m_verRead >= lovrBefore->m_verWrite)
+				{
+					// lovrBefore is tx before read snapshot. It does not conflict.
+
+					break; // exit loop as older tx is also expected to be before read snapshot
+				}
+
+				lovr->filterConflict(lovrBefore);
+			}
+			lovrVerified = lovrPrev;
+
+			if(__sync_bool_compare_and_swap(&m_lovrVerifiedTip, lovrPrev, lovr))
+			{
+				// CAS succeed and _lovr_ has been successfully added to list of verified txs...
+
+				// memo the tx ver
+				verW = lovr->m_verWrite;
+				
+				break; // step 1 done!
+			}
+			else
+			{
+				// some other unverified tx has been added to the list...
+
+				// RETRY!
+			}
+		}
+	}
+
+	PTNK_THROW_LOGIC_ERR("FIXME: not yet impl.");
+
+	return verW;
+}
 
 void
 ActiveOvr::dump(std::ostream& s) const

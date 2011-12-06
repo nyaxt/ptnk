@@ -34,8 +34,7 @@ enum ovr_status_t
 
 inline int pgidhash(page_id_t pgid)
 {
-	return pgid % TPIO_NHASH;
-}
+	return pgid % TPIO_NHASH; }
 
 class PgidBloomFilter
 {
@@ -106,7 +105,17 @@ private:
 	ver_t m_verWrite;
 
 	friend class ActiveOvr;
+
+	//! check if "OvrEntry"s this owns conflict with _other_'s
+	/*!
+	 *	@return
+	 *		false if no conflict detected
+	 */
 	bool checkConflict(LocalOvr* other);
+
+	//! remove "OvrEntry"s from this which conflict with _other_'s
+	void filterConflict(LocalOvr* other);
+
 	LocalOvr* m_prev;
 	bool m_mergeOngoing;
 	bool m_merged;
@@ -140,6 +149,8 @@ public:
 	 *		version number of committed tx
 	 */
 	ver_t tryCommit(unique_ptr<LocalOvr>& lovr, ver_t verW = TXID_INVALID);
+
+	ver_t tryCommitRefresh(unique_ptr<LocalOvr>& lovr);
 
 	//! prevent further tx from committing
 	void terminate();

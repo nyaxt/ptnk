@@ -328,7 +328,7 @@ TPIO2::commitTxPages(TPIO2TxSession* tx, ver_t verW, bool isRebase)
 }
 
 bool
-TPIO2::tryCommit(TPIO2TxSession* tx)
+TPIO2::tryCommit(TPIO2TxSession* tx, commit_flags_t flags)
 {
 	if(tx->m_pagesModified.empty())
 	{
@@ -340,9 +340,19 @@ TPIO2::tryCommit(TPIO2TxSession* tx)
 	ver_t verW;
 	{
 		MUTEXPROF_START("aovr tryCommit");
-		if((verW = tx->m_aovr->tryCommit(tx->m_lovr)) == TXID_INVALID)
+		if(!(flags & COMMIT_REFRESH))
 		{
-			return false;
+			if((verW = tx->m_aovr->tryCommit(tx->m_lovr)) == TXID_INVALID)
+			{
+				return false;
+			}
+		}
+		else // flags & COMMIT_REFRESH
+		{
+			if((verW = tx->m_aovr->tryCommitRefresh(tx->m_lovr)) == TXID_INVALID)
+			{
+				return false;
+			}
 		}
 		MUTEXPROF_END;
 	}
@@ -675,7 +685,34 @@ TPIO2::rebase(bool force)
 void
 TPIO2::refreshOldPages(page_id_t threshold)
 {
-	std::cerr << "FIXME: TPIO2::refleshOldPages not yet implemented!" << std::endl;
+	if(m_bDuringRefresh) return; // already during refresh
+	if(! __sync_bool_compare_and_swap(&m_bDuringRefresh, false, true)) return;
+
+#ifdef VERBOSE_REFRESH
+	std::cout << "refresh start" << std::endl << *this;
+#endif
+	
+	void* cursor = NULL;
+	{
+		unique_ptr<TPIO2TxSession> tx(newTransaction());
+
+		Page pgStart(tx->readPage(tx->pgidStartPage()));
+		
+		static const int MAX_PAGES = INT_MAX; // FIXME!
+		pgStart.refreshAllLeafPages(&cursor, threshold, MAX_PAGES, PGID_INVALID, tx.get());
+
+#ifdef VERBOSE_REFRESH
+		tx->dumpStat();
+#endif
+		if(! tryCommit(tx.get(), COMMIT_REFRESH))
+		{
+			std::cerr << "refresh ci failed!" << std::endl;	
+		}
+	}
+
+#ifdef VERBOSE_REFRESH
+	std::cout << "refresh end" << std::endl << *this;
+#endif
 }
 
 void
