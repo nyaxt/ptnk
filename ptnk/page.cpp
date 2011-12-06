@@ -173,7 +173,7 @@ BinTreePage::dumpGraph_(FILE* fp, PageIO* pio) const
 
 	fprintf(fp, "\"page%u\" [\n", (unsigned int)pageId());
 	std::string strPageId = pgid2str(pageId());
-	std::string strPageOvrTgt = pgid2str(pageId());
+	std::string strPageOvrTgt = pgid2str(pageOvrTgt());
 	fprintf(fp, "label = \"[id: %s ovr: %s]:%c\"", strPageId.c_str(), strPageOvrTgt.c_str(), body->c);
 	fprintf(fp, "];\n");
 	
@@ -190,6 +190,8 @@ BinTreePage::dumpGraph_(FILE* fp, PageIO* pio) const
 bool
 BinTreePage::refreshAllLeafPages_(void** cursor, page_id_t threshold, int numPages, page_id_t pgidDep, PageIO* pio) const
 {
+	std::cerr << "refreshAllLeafPages called for page " << pageId() << std::endl;
+
 	const Layout* body = reinterpret_cast<const Layout*>(rawbody());
 	if(body->child[0] == PGID_INVALID)
 	{
@@ -200,6 +202,8 @@ BinTreePage::refreshAllLeafPages_(void** cursor, page_id_t threshold, int numPag
 			// re-write this page to the log
 			BinTreePage refresh(pio->modifyPage(*this));
 			pio->sync(refresh);
+
+			std::cerr << "refresh page " << pageId() << " -> " << refresh.pageId() << std::endl;
 
 			return true;
 		}

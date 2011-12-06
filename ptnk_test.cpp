@@ -339,10 +339,9 @@ TEST(ptnk, buffer_null)
 	EXPECT_TRUE(buf.isNull());
 }
 
-TEST(ptnk, BinTree_basic)
+page_id_t
+genTestBinTree(PageIO* pio)
 {
-	unique_ptr<PageIO> pio(new PageIOMem);
-
 	//       A       |
 	//      / \      |
 	//     B   C     |
@@ -350,37 +349,48 @@ TEST(ptnk, BinTree_basic)
 	//       D   E   |
 	
 	bool bOvr = false;
-
 	BinTreePage lE(pio->newInitPage<BinTreePage>());
-	lE.set('E', PGID_INVALID, PGID_INVALID, &bOvr, pio.get());
+	lE.set('E', PGID_INVALID, PGID_INVALID, &bOvr, pio);
 	EXPECT_FALSE(bOvr); bOvr = false;
 
 	BinTreePage lD(pio->newInitPage<BinTreePage>());
-	lD.set('D', PGID_INVALID, PGID_INVALID, &bOvr, pio.get());
+	lD.set('D', PGID_INVALID, PGID_INVALID, &bOvr, pio);
 	EXPECT_FALSE(bOvr); bOvr = false;
 
 	BinTreePage lC(pio->newInitPage<BinTreePage>());
-	lC.set('C', lD.pageId(), lE.pageId(), &bOvr, pio.get());
+	lC.set('C', lD.pageId(), lE.pageId(), &bOvr, pio);
 	EXPECT_FALSE(bOvr); bOvr = false;
 
 	BinTreePage lB(pio->newInitPage<BinTreePage>());
-	lB.set('B', PGID_INVALID, PGID_INVALID, &bOvr, pio.get());
+	lB.set('B', PGID_INVALID, PGID_INVALID, &bOvr, pio);
 	EXPECT_FALSE(bOvr); bOvr = false;
 
 	BinTreePage lA(pio->newInitPage<BinTreePage>());
-	lA.set('A', lB.pageId(), lC.pageId(), &bOvr, pio.get());
+	lA.set('A', lB.pageId(), lC.pageId(), &bOvr, pio);
 	EXPECT_FALSE(bOvr); bOvr = false;
 
-	lA.dump(pio.get());
-	{
-		FILE* fp = fopen("graphdump/bintree_basic.gv", "w");
-		fprintf(fp, "digraph bptree {\n");
-		lA.dumpGraph(fp, pio.get());
-		fprintf(fp, "}");
-		fclose(fp);
-	}
+	return lA.pageId();
 }
 
+void
+dumpGraphBinTree(const Page& pg, PageIO* pio, const char* filename)
+{
+	FILE* fp = fopen(filename, "w");
+	fprintf(fp, "digraph bptree {\n");
+	pg.dumpGraph(fp, pio);
+	fprintf(fp, "}");
+	fclose(fp);
+}
+
+TEST(ptnk, BinTree_dump)
+{
+	unique_ptr<PageIO> pio(new PageIOMem);
+
+	BinTreePage lA(pio->readPage(genTestBinTree(pio.get())));
+
+	lA.dump(pio.get());
+	dumpGraphBinTree(lA, pio.get(), "graphdump/bintree_basic.gv");
+}
 
 TEST(ptnk, leaf_verybasic)
 {
@@ -2872,6 +2882,45 @@ TEST(ptnk, TPIO_commitfail)
 
 		ASSERT_TRUE(tx1->tryCommit());
 		ASSERT_EQ(!shouldfail, tx2->tryCommit());
+	}
+}
+
+TEST(ptnk, TPIO_refreshOldPages_basic)
+{
+	shared_ptr<PageIO> pio(new PageIOMem);
+	TPIO2 tpio(pio);
+
+	{
+		unique_ptr<TPIO2TxSession> tx1(tpio.newTransaction());
+
+		tx1->setPgidStartPage(genTestBinTree(tx1.get()));
+
+		ASSERT_TRUE(tx1->tryCommit());
+	}
+
+	// create 200 dummy pages
+	for(int i = 0; i < 20; ++ i)
+	{
+		unique_ptr<TPIO2TxSession> txUmeUme(tpio.newTransaction());
+		
+		for(int j = 0; j < 10; ++ j)
+		{
+			DebugPage pg(txUmeUme->newInitPage<DebugPage>());
+			pio->sync(pg);
+		}
+
+		ASSERT_TRUE(txUmeUme->tryCommit());
+	}
+
+	tpio.refreshOldPages(200);
+
+	{
+		unique_ptr<TPIO2TxSession> tx1(tpio.newTransaction());
+		
+		BinTreePage pg(pio->readPage(tx1->pgidStartPage()));
+		dumpGraphBinTree(pg, pio.get(), "graphdump/bintree_after_refresh.gv");
+
+		EXPECT_GT(0, pg.pageId());
 	}
 }
 
