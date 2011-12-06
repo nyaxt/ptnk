@@ -170,7 +170,7 @@ TEST(ptnk, stm_multithread_w_conflict)
 	boost::thread_group tg;
 
 	const int NUM_TX = 1000000;
-	int committed_tx = -2;
+	volatile int committed_tx = -2;
 	tg.create_thread([&]() {
 		for(int i = 0; i < NUM_TX; ++ i)
 		{
@@ -203,9 +203,9 @@ TEST(ptnk, stm_multithread_w_conflict)
 			// - wait till a tx is committed
 			__sync_synchronize(); // make sure we read latest committed_tx below
 			int x = committed_tx;
-			if(x == -1) break;
 			while(x >= committed_tx)
 			{
+				if(committed_tx == -1) return;
 				asm volatile("" : : : "memory");
 			}
 
