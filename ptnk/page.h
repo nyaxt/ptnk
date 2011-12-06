@@ -38,6 +38,7 @@ enum page_type_t_
 	PT_COMPMAP,
 
 	PT_DEBUG,
+	PT_DEBUG_BINARYTREE,
 
 	PT_MAX = 255,
 };
@@ -288,6 +289,34 @@ public:
 
 	void set(char c, bool* bOvr, PageIO* pio);
 	char get() { return *rawbody(); }
+};
+
+class BinTreePage : public Page
+{
+public:
+	enum { TYPE = PT_DEBUG_BINARYTREE, };
+
+	BinTreePage() { /* NOP */ }
+	explicit BinTreePage(const Page& pg, bool force = false)
+	{
+		if(! force) { PTNK_ASSERT(pg.pageType() == TYPE); }	
+		*reinterpret_cast<Page*>(this) = pg;
+	}
+	
+	void init(page_id_t id)
+	{
+		initHdr(id, TYPE);
+	}
+
+	void set(char c, page_id_t pgidA, page_id_t pgidB, bool* bOvr, PageIO* pio);
+
+	void updateLinks_(mod_info_t* mod, PageIO* pio);
+	void dump_(PageIO* pio = NULL) const;
+	void dumpGraph_(FILE* fp, PageIO* pio = NULL) const;
+	bool refreshAllLeafPages_(void** cursor, page_id_t threshold, int numPages, page_id_t pgidDep, PageIO* pio) const;
+
+private:
+	struct Layout;
 };
 
 } // end of namespace ptnk

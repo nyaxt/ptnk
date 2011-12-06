@@ -130,6 +130,13 @@ inline
 std::ostream& operator<<(std::ostream& s, const LocalOvr& o)
 { o.dump(s); return s; }
 
+enum commit_flags_t
+{
+	COMMIT_DEFAULT = 0,
+	COMMIT_REFRESH,	//!< refresh txs
+	COMMIT_REPLAY, //!< tx replays (no conflict ensured)
+};
+
 class ActiveOvr
 {
 public:
@@ -148,9 +155,7 @@ public:
 	 *	@return
 	 *		version number of committed tx
 	 */
-	ver_t tryCommit(unique_ptr<LocalOvr>& lovr, ver_t verW = TXID_INVALID);
-
-	ver_t tryCommitRefresh(unique_ptr<LocalOvr>& lovr);
+	ver_t tryCommit(unique_ptr<LocalOvr>& lovr, commit_flags_t flags = COMMIT_DEFAULT, ver_t verW = TXID_INVALID);
 
 	//! prevent further tx from committing
 	void terminate();

@@ -136,12 +136,6 @@ public:
 
 	unique_ptr<TPIO2TxSession> newTransaction();
 
-	enum commit_flags_t
-	{
-		COMMIT_DEFAULT = 0,
-		COMMIT_REFRESH = 1,	
-	};
-
 	bool tryCommit(TPIO2TxSession* tx, commit_flags_t flags = COMMIT_DEFAULT);
 
 	void rebase(bool force);

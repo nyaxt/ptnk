@@ -771,7 +771,6 @@ Node::refreshAllLeafPages_(void** cursor, page_id_t threshold, int numPages, pag
 			pio->sync(leafNew);
 			
 			// propagate page w/ old link
-			// FIXME: below code dup from btree_put -> maybe include in btree_cursor_t?
 			VNode::const_reverse_iterator itNodes = bc.nodes.rbegin(), itE = bc.nodes.rend();
 			while(itNodes != itE)
 			{

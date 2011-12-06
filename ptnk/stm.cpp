@@ -115,7 +115,31 @@ LocalOvr::checkConflict(LocalOvr* other)
 		// a bloomfilter ensures that there are no conflict.
 		return false;
 	}
-	
+
+	#if 1
+	ver_t verWOther = other->verWrite();
+	for(int i = 0; i < TPIO_NHASH; ++ i)
+	{
+		for(OvrEntry* eL = m_hashOvrs[i]; eL && eL->ver == TAG_TXVER_LOCAL; eL = eL->prev)
+		{
+			page_id_t pgidL = eL->pgidOrig;
+			if(! other->m_bfOvrs.mayContain(pgidL))
+			{
+				// a bloomfilter ensures that other->m_hashOvrs[i] list would not conflict w/ eL
+				continue;
+			}
+
+			for(OvrEntry* eO = other->m_hashOvrs[i]; eO && (eO->ver == TAG_TXVER_LOCAL || eO->ver == verWOther); eO = eO->prev)
+			{
+				if(eO->pgidOrig == pgidL)
+				{
+					// detect conflict
+					return true;
+				}
+			}
+		}
+	}
+	#else
 	const int iE = m_pgidOrigs.size();
 	const int jE = other->m_pgidOrigs.size();
 	for(int i = 0; i < iE; ++ i)
@@ -138,6 +162,7 @@ LocalOvr::checkConflict(LocalOvr* other)
 			}
 		}
 	}
+	#endif
 
 	return false;
 }
@@ -157,7 +182,37 @@ LocalOvr::filterConflict(LocalOvr* other)
 		return;
 	}
 	
-	PTNK_THROW_LOGIC_ERR("FIXME: not yet impl.");
+	ver_t verWOther = other->verWrite();
+	for(int i = 0; i < TPIO_NHASH; ++ i)
+	{
+		for(OvrEntry* eL = m_hashOvrs[i]; eL && eL->ver == TAG_TXVER_LOCAL;)
+		{
+			page_id_t pgidL = eL->pgidOrig;
+			if(! other->m_bfOvrs.mayContain(pgidL))
+			{
+				// a bloomfilter ensures that other->m_hashOvrs[i] list would not conflict w/ eL
+				goto NEXT;	
+			}
+
+			for(OvrEntry* eO = other->m_hashOvrs[i]; eO && (eO->ver == TAG_TXVER_LOCAL || eO->ver == verWOther); eO = eO->prev)
+			{
+				if(eO->pgidOrig == pgidL)
+				{
+					// detect conflict
+
+					// remove eL from the list
+					OvrEntry* prev = eL->prev;
+					delete eL;
+					eL = prev;
+
+					continue;
+				}
+			}
+
+			NEXT:
+			eL = eL->prev;
+		}
+	}
 }
 
 void
@@ -267,7 +322,34 @@ ActiveOvr::merge(LocalOvr* lovr)
 	{
 		int roti = i; //(i + off) % TPIO_NHASH;
 
-		// find the last entry of local ovrs and fill e->ver fields
+		// concat new OvrEntries (identified by e->ver == LocalOvr::TAG_TXVER_LOCAL)
+		// to aovr::m_hashOvrs[i] 
+		//
+		// [x] : OvrEntry w/ ver _x_
+		// <-  : OvrEntry::prev ptr
+		//
+		// BEFORE:
+		//
+		// m_hashOvrs[i] ss
+		// @ start of tx     laste      lovr->m_hashOvrs[i]
+		//   /----------------[L]<-[L]<-[L]
+		//  v
+		// [5]<-[6]<-[6]<-[7]<=aovr::m_hashOvrs[i] 
+		//
+		//     \------v-----/
+		//       OvrEntries committed after ss
+		// 
+		// AFTER:
+		//
+		//                    [8]<-[8]<-[8]<=aovr::m_hashOvrs[i] 
+		//                   /
+		//                  v
+		// [5]<-[6]<-[6]<-[7]
+		//
+		//                    \-----v-----/
+		//                     these OvrEntries are now owned by aovr
+
+		// find _laste_, the last entry of local ovrs and fill e->ver fields
 		OvrEntry* laste = NULL;
 		for(OvrEntry* e = lovr->m_hashOvrs[roti]; e && e->ver == LocalOvr::TAG_TXVER_LOCAL; e = e->prev)
 		{
@@ -279,7 +361,7 @@ ActiveOvr::merge(LocalOvr* lovr)
 		if(laste)
 		{
 			laste->prev = m_hashOvrs[roti];
-			__sync_synchronize();
+			__sync_synchronize(); // laste->prev must be set before tail upd
 
 			m_hashOvrs[roti] = lovr->m_hashOvrs[roti];
 		}
@@ -313,9 +395,11 @@ ActiveOvr::mergeUpto(LocalOvr* lovrTip)
 }
 
 ver_t
-ActiveOvr::tryCommit(unique_ptr<LocalOvr>& plovr, ver_t verW)
+ActiveOvr::tryCommit(unique_ptr<LocalOvr>& plovr, commit_flags_t flags, ver_t verW)
 {
 	LocalOvr* lovr = plovr.get();
+
+	// FIXME: optimize for case COMMIT_REPLAY (no conflict check needed)
 
 	// step 1: validate _lovr_ that it does not conflict with other txs and add _lovr_ to validated ovrs list
 	{
@@ -351,14 +435,21 @@ ActiveOvr::tryCommit(unique_ptr<LocalOvr>& plovr, ver_t verW)
 					break; // exit loop as older tx is also expected to be before read snapshot
 				}
 
-				if(lovr->checkConflict(lovrBefore))
+				if(PTNK_UNLIKELY(flags == COMMIT_REFRESH))
 				{
-					// lovr conflicts with lovrBefore...
+					lovr->filterConflict(lovrBefore);
+				}
+				else // flags != COMMIT_REFRESH
+				{
+					if(lovr->checkConflict(lovrBefore))
+					{
+						// lovr conflicts with lovrBefore...
 
-					// abort commit
-					lovr->m_prev = nullptr;
-					lovr->m_verWrite = 0;
-					return TXID_INVALID;
+						// abort commit
+						lovr->m_prev = nullptr;
+						lovr->m_verWrite = 0;
+						return TXID_INVALID;
+					}
 				}
 			}
 			lovrVerified = lovrPrev;
@@ -386,64 +477,6 @@ ActiveOvr::tryCommit(unique_ptr<LocalOvr>& plovr, ver_t verW)
 	mergeUpto(lovr);
 
 	plovr.release();
-	return verW;
-}
-
-ver_t
-ActiveOvr::tryCommitRefresh(unique_ptr<LocalOvr>& plovr)
-{
-	LocalOvr* lovr = plovr.get();
-
-	// step 1: remove ovr entries from _lovr_ which conflict with other txs and add _lovr_ to validated ovrs list
-	ver_t verW = TXID_INVALID;
-	{
-		LocalOvr* lovrVerified = NULL;
-
-		for(;;)
-		{
-			LocalOvr* lovrPrev = m_lovrVerifiedTip;
-
-			// tx may not committed after terminator
-			if(lovrPrev && lovrPrev->m_bTerminator) return PGID_INVALID;
-
-			lovr->m_prev = lovrPrev;
-			lovr->m_verWrite = (lovrPrev ? lovrPrev->m_verWrite : m_verBase) + 1;
-			__sync_synchronize(); // lovr->m_prev must be set BEFORE tip ptr CAS swing below
-
-			// check conflict with txs committed after read snapshot
-			for(LocalOvr* lovrBefore = lovrPrev; lovrBefore && lovrBefore != lovrVerified; lovrBefore = lovrBefore->m_prev)
-			{
-				if(lovr->m_verRead >= lovrBefore->m_verWrite)
-				{
-					// lovrBefore is tx before read snapshot. It does not conflict.
-
-					break; // exit loop as older tx is also expected to be before read snapshot
-				}
-
-				lovr->filterConflict(lovrBefore);
-			}
-			lovrVerified = lovrPrev;
-
-			if(__sync_bool_compare_and_swap(&m_lovrVerifiedTip, lovrPrev, lovr))
-			{
-				// CAS succeed and _lovr_ has been successfully added to list of verified txs...
-
-				// memo the tx ver
-				verW = lovr->m_verWrite;
-				
-				break; // step 1 done!
-			}
-			else
-			{
-				// some other unverified tx has been added to the list...
-
-				// RETRY!
-			}
-		}
-	}
-
-	PTNK_THROW_LOGIC_ERR("FIXME: not yet impl.");
-
 	return verW;
 }
 

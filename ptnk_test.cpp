@@ -339,6 +339,49 @@ TEST(ptnk, buffer_null)
 	EXPECT_TRUE(buf.isNull());
 }
 
+TEST(ptnk, BinTree_basic)
+{
+	unique_ptr<PageIO> pio(new PageIOMem);
+
+	//       A       |
+	//      / \      |
+	//     B   C     |
+	//        / \    |
+	//       D   E   |
+	
+	bool bOvr = false;
+
+	BinTreePage lE(pio->newInitPage<BinTreePage>());
+	lE.set('E', PGID_INVALID, PGID_INVALID, &bOvr, pio.get());
+	EXPECT_FALSE(bOvr); bOvr = false;
+
+	BinTreePage lD(pio->newInitPage<BinTreePage>());
+	lD.set('D', PGID_INVALID, PGID_INVALID, &bOvr, pio.get());
+	EXPECT_FALSE(bOvr); bOvr = false;
+
+	BinTreePage lC(pio->newInitPage<BinTreePage>());
+	lC.set('C', lD.pageId(), lE.pageId(), &bOvr, pio.get());
+	EXPECT_FALSE(bOvr); bOvr = false;
+
+	BinTreePage lB(pio->newInitPage<BinTreePage>());
+	lB.set('B', PGID_INVALID, PGID_INVALID, &bOvr, pio.get());
+	EXPECT_FALSE(bOvr); bOvr = false;
+
+	BinTreePage lA(pio->newInitPage<BinTreePage>());
+	lA.set('A', lB.pageId(), lC.pageId(), &bOvr, pio.get());
+	EXPECT_FALSE(bOvr); bOvr = false;
+
+	lA.dump(pio.get());
+	{
+		FILE* fp = fopen("graphdump/bintree_basic.gv", "w");
+		fprintf(fp, "digraph bptree {\n");
+		lA.dumpGraph(fp, pio.get());
+		fprintf(fp, "}");
+		fclose(fp);
+	}
+}
+
+
 TEST(ptnk, leaf_verybasic)
 {
 	unique_ptr<PageIO> pio(new PageIOMem);

@@ -6,6 +6,7 @@
 // #define DEBUG_VERBOSE_TPIOPIO
 // #define DEBUG_VERBOSE_RESTORESTATE
 // #define VERBOSE_REBASE
+#define VERBOSE_REFRESH
 
 namespace ptnk
 {
@@ -340,19 +341,9 @@ TPIO2::tryCommit(TPIO2TxSession* tx, commit_flags_t flags)
 	ver_t verW;
 	{
 		MUTEXPROF_START("aovr tryCommit");
-		if(!(flags & COMMIT_REFRESH))
+		if((verW = tx->m_aovr->tryCommit(tx->m_lovr, flags)) == TXID_INVALID)
 		{
-			if((verW = tx->m_aovr->tryCommit(tx->m_lovr)) == TXID_INVALID)
-			{
-				return false;
-			}
-		}
-		else // flags & COMMIT_REFRESH
-		{
-			if((verW = tx->m_aovr->tryCommitRefresh(tx->m_lovr)) == TXID_INVALID)
-			{
-				return false;
-			}
+			return false;
 		}
 		MUTEXPROF_END;
 	}
@@ -491,7 +482,7 @@ TPIO2::restoreState()
 			// -- ovr entries
 			if(verCurrent != verBase)
 			{
-				PTNK_CHECK(verCurrent == m_aovr->tryCommit(tx->m_lovr, verCurrent));
+				PTNK_CHECK(verCurrent == m_aovr->tryCommit(tx->m_lovr, COMMIT_REPLAY, verCurrent));
 			}
 			tx = newTransaction();
 
@@ -537,7 +528,7 @@ TPIO2::restoreState()
 	m_stat.nUniquePages = tx->m_stat.nUniquePages; // FIXME
 	if(verCurrent != verBase)
 	{
-		PTNK_CHECK(verCurrent == m_aovr->tryCommit(tx->m_lovr, verCurrent));
+		PTNK_CHECK(verCurrent == m_aovr->tryCommit(tx->m_lovr, COMMIT_REPLAY, verCurrent));
 	}
 }
 

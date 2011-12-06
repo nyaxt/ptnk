@@ -1,3 +1,7 @@
+- need refactoring:
+  - Page::updateLinks_ depend on mod_info_t, which is deprecated
+  - Page::refreshAllLeafPages_ has pgidDep arg, which is not used at all
+
 - workdir may change while run by lib user
   - PartitionedPageIO have to handle that
 
