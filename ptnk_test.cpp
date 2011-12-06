@@ -26,6 +26,34 @@
 #include <gtest/gtest.h>
 using namespace ptnk;
 
+class PageIOProxy : public PageIO
+{
+public:
+	PageIOProxy(PageIO* tgt)
+	: m_tgt(tgt)
+	{ /* NOP */ }
+
+	pair<Page, page_id_t> newPage() { return m_tgt->newPage();}
+	Page readPage(page_id_t id) { return m_tgt->readPage(id); }
+	Page modifyPage(const Page& page, mod_info_t* mod) { return m_tgt->modifyPage(page, mod); }
+	Page modifyPage(const Page& page, bool* bNewPage = NULL) { return m_tgt->modifyPage(page, bNewPage); }
+	void discardPage(page_id_t pgid, mod_info_t* mod = NULL) { return m_tgt->discardPage(pgid, mod); }
+	void sync(page_id_t pgid) { m_tgt->sync(pgid); }
+	void syncRange(page_id_t pgidStart, page_id_t pgidEnd) { m_tgt->syncRange(pgidStart, pgidEnd); }
+	page_id_t getFirstPgId() const { return m_tgt->getFirstPgId(); }
+	page_id_t getLastPgId() const { return m_tgt->getLastPgId(); }
+	local_pgid_t getPartLastLocalPgId(part_id_t ptid) const { return m_tgt->getPartLastLocalPgId(ptid); }
+	void notifyPageWOldLink(page_id_t pgid) { m_tgt->notifyPageWOldLink(pgid); }
+	page_id_t updateLink(page_id_t pgidOld) { return m_tgt->updateLink(pgidOld); }
+	bool needInit() const { return m_tgt->needInit(); }
+	void newPart(bool bForce = true) { m_tgt->newPart(bForce); }
+	void discardOldPages(page_id_t threshold) { m_tgt->discardOldPages(threshold); }
+	void dumpStat() const { m_tgt->dumpStat(); }
+
+private:
+	PageIO* m_tgt;
+};
+
 void
 t_mktmpdir(const char* path)
 {
@@ -2885,6 +2913,24 @@ TEST(ptnk, TPIO_commitfail)
 	}
 }
 
+class CheckOldPgAccess : public PageIOProxy
+{
+public:
+	CheckOldPgAccess(PageIO* tgt, page_id_t threshold)
+	:	PageIOProxy(tgt), m_threshold(threshold)
+	{ /* NOP */ }
+
+	Page readPage(page_id_t pgid)
+	{
+		EXPECT_LT(m_threshold, pgid);
+
+		return PageIOProxy::readPage(pgid);	
+	}
+
+private:
+	page_id_t m_threshold;	
+};
+
 TEST(ptnk, TPIO_refreshOldPages_basic)
 {
 	shared_ptr<PageIO> pio(new PageIOMem);
@@ -2916,11 +2962,12 @@ TEST(ptnk, TPIO_refreshOldPages_basic)
 
 	{
 		unique_ptr<TPIO2TxSession> tx1(tpio.newTransaction());
-		
-		BinTreePage pg(pio->readPage(tx1->pgidStartPage()));
-		dumpGraphBinTree(pg, pio.get(), "graphdump/bintree_after_refresh.gv");
 
-		EXPECT_GT(0, pg.pageId());
+		EXPECT_LT(5, tx1->pgidStartPage());
+		
+		CheckOldPgAccess c(tx1.get(), 5);
+		BinTreePage pg(c.readPage(tx1->pgidStartPage()));
+		dumpGraphBinTree(pg, &c, "graphdump/bintree_after_refresh.gv");
 	}
 }
 

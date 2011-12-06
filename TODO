@@ -25,7 +25,6 @@
 
 mysql storage engine known bugs:
 - entire db is lost at unknown timing
-- TPC-C fails to run
 
 ptnk known issues list:
 
@@ -44,6 +43,3 @@ FIXLATER
 
 PERFORMANCE ISSUES
 - PartitionedPageIO impl. is very inefficient (especially PartitionedPageIO::readPage)
-
-NO TEST
-- add test for compaction (check no record loss)

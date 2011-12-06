@@ -695,7 +695,7 @@ TPIO2::refreshOldPages(page_id_t threshold)
 #ifdef VERBOSE_REFRESH
 		tx->dumpStat();
 #endif
-		if(! tryCommit(tx.get(), COMMIT_REFRESH))
+		if(! tryCommit(tx.get())) //, COMMIT_REFRESH))
 		{
 			std::cerr << "refresh ci failed!" << std::endl;	
 		}
@@ -704,6 +704,8 @@ TPIO2::refreshOldPages(page_id_t threshold)
 #ifdef VERBOSE_REFRESH
 	std::cout << "refresh end" << std::endl << *this;
 #endif
+
+	rebase(/* force = */ true);
 }
 
 void
