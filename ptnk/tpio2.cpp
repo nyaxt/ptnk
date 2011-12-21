@@ -337,6 +337,21 @@ TPIO2::tryCommit(TPIO2TxSession* tx, commit_flags_t flags)
 		return true;
 	}
 
+	// NOTE: the below commit process separates
+	//       - transaction validation (check no conflict)
+	//       - log commit
+	//
+	// This will allow txs started just after validation to read
+	// un-committed tx writes which has not yet been written to the log.
+	// Users has to be aware of this design.
+	// Although these are likely to cause no practical problems for following reasons:
+	// - those un-committed tx are guaranteed to success commit
+	// - the later tx are ONLY allowed to be commit AFTER the dependent ead tx commit
+	//
+	// A possible solution is to block the un-committed read OR do not allow tx to be read until the commit is processed, but it would cause big degrade in performance.
+	//
+	// cf. Eljas Soisalon-soininen, Tatu Ylönen, "Partial Strictness in Two-Phase Locking"
+
 	// 1. try committing ovr info
 	ver_t verW;
 	{
@@ -349,6 +364,7 @@ TPIO2::tryCommit(TPIO2TxSession* tx, commit_flags_t flags)
 	}
 
 	// ovr info committed! now tx is guaranteed to be valid...
+	// * the later tx will read the writes caused by this tx.
 	
 	// 2. update stat data
 	m_stat.merge(tx->m_stat);
@@ -674,8 +690,35 @@ TPIO2::rebase(bool force)
 }
 
 void
-TPIO2::refreshOldPages(page_id_t threshold)
+TPIO2::refreshOldPages(page_id_t threshold, size_t pgsPerTx)
 {
+	// rOP: refreshOldPages
+	//
+	// case 1:
+	//    rOP    s---e
+	//    Rebase       s---e
+	//
+	//    no prob
+	//
+	// case 2:
+	//    rOP          s---e
+	//    Rebase s---e      s---e
+	//
+	//    no prob
+	//
+	// case 3:
+	//    rOP        s-!---e
+	//    Rebase s-----e
+	//
+	//    no prob. rOP waits until rebase is done
+	//
+	// case 4:
+	//    rOP    s---e
+	//    Rebase   s-!---e
+	//
+	//    rebase need to wait until rOP finishes... BAD!
+	//
+
 	if(m_bDuringRefresh) return; // already during refresh
 	if(! __sync_bool_compare_and_swap(&m_bDuringRefresh, false, true)) return;
 
@@ -684,22 +727,23 @@ TPIO2::refreshOldPages(page_id_t threshold)
 #endif
 	
 	void* cursor = NULL;
+	do
 	{
 		unique_ptr<TPIO2TxSession> tx(newTransaction());
 
 		Page pgStart(tx->readPage(tx->pgidStartPage()));
 		
-		static const int MAX_PAGES = INT_MAX; // FIXME!
-		pgStart.refreshAllLeafPages(&cursor, threshold, MAX_PAGES, PGID_INVALID, tx.get());
+		pgStart.refreshAllLeafPages(&cursor, threshold, pgsPerTx, PGID_INVALID, tx.get());
 
 #ifdef VERBOSE_REFRESH
 		tx->dumpStat();
 #endif
-		if(! tryCommit(tx.get())) //, COMMIT_REFRESH))
+		if(! tryCommit(tx.get(), COMMIT_REFRESH))
 		{
 			std::cerr << "refresh ci failed!" << std::endl;	
 		}
 	}
+	while(cursor);
 
 #ifdef VERBOSE_REFRESH
 	std::cout << "refresh end" << std::endl << *this;

@@ -27,11 +27,6 @@ val2cref(VALUE val, VALUE* tmp)
 	{
 		return ptnk::BufferCRef::NULL_VAL;	
 	}
-	else if(FIXNUM_P(val))
-	{
-		static unsigned long n = htonl(FIX2ULONG(val));
-		return ptnk::BufferCRef(&n, sizeof(unsigned long));
-	}
 	else
 	{
 		*tmp = StringValue(val);	
@@ -43,11 +38,11 @@ inline
 VALUE
 cref2val(const ptnk::BufferCRef& buf)
 {
-	if(buf.isNull())
+	if(PTNK_UNLIKELY(buf.isNull()))
 	{
 		return Qnil;	
 	}
-	else if(buf.isValid())
+	else if(PTNK_LIKELY(buf.isValid()))
 	{
 		return rb_str_new(buf.get(), buf.size());
 	}
@@ -72,6 +67,8 @@ rb_ptnk_db_free(rb_ptnk_db* db)
 	}
 	db->impl = NULL;
 }
+
+VALUE db_close(VALUE self);
 
 VALUE
 db_new(int argc, VALUE* argv, VALUE klass)
@@ -101,6 +98,11 @@ db_new(int argc, VALUE* argv, VALUE klass)
 
 	db->impl = new ptnk::DB(filename, opts, mode);
 
+	if(rb_block_given_p())
+	{
+		return rb_ensure((ruby_method_t)rb_yield, ret, (ruby_method_t)db_close, ret);
+	}
+
 	return ret;
 }
 
@@ -121,6 +123,18 @@ db_close(VALUE self)
 	rb_ptnk_db* db; \
 	Data_Get_Struct(VDB, rb_ptnk_db, db); \
 	if(! db->impl) rb_raise(rb_eRuntimeError, "db is closed");
+
+#define COMMON_CATCH_BLOCKS \
+	catch(std::exception& e) \
+	{ \
+		rb_raise(rb_eRuntimeError, e.what().c_str()); \
+		return 0; \
+	} \
+	catch(...) \
+	{ \
+		rb_raise(rb_eRuntimeError, "unknown C++ exception caught"); \
+		return 0; \
+	}
 
 VALUE
 db_get(VALUE self, VALUE key)
@@ -564,10 +578,12 @@ Init_ptnk()
 	WRAP_CONST(AFTER);
 	WRAP_CONST(FRONT);
 	WRAP_CONST(BACK);
+	#undef WRAP_CONST
 
 	RBK_db = rb_define_class_under(RBM_ptnk, "DB", rb_cObject);
 	
 	rb_define_singleton_method(RBK_db, "new", (ruby_method_t)db_new, -1);
+	rb_define_singleton_method(RBK_db, "open", (ruby_method_t)db_new, -1);
 	rb_define_method(RBK_db, "close", (ruby_method_t)db_close, 0);
 	rb_define_method(RBK_db, "get", (ruby_method_t)db_get, 1);
 	rb_define_method(RBK_db, "put", (ruby_method_t)db_put, -1);

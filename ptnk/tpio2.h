@@ -124,6 +124,7 @@ std::ostream& operator<<(std::ostream& s, const TPIO2TxSession& o)
 { o.dump(s); return s; }
 
 constexpr unsigned int REBASE_THRESHOLD = TPIO_NHASH * 8;
+constexpr size_t REFRESH_PGS_PER_TX_DEFAULT = 128;
 
 class TPIO2
 {
@@ -139,7 +140,7 @@ public:
 	bool tryCommit(TPIO2TxSession* tx, commit_flags_t flags = COMMIT_DEFAULT);
 
 	void rebase(bool force);
-	void refreshOldPages(page_id_t threshold);
+	void refreshOldPages(page_id_t threshold, size_t pgsPerTx = REFRESH_PGS_PER_TX_DEFAULT);
 
 	PageIO* backend()
 	{

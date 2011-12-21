@@ -4,10 +4,17 @@ require 'tmpdir'
 describe Ptnk::DB do
 
   it "should be able to put/get records" do
-    db = Ptnk::DB.new('') # on memory db
+    db = Ptnk::DB.new # on memory db
 
     db.put("hello", "world")
     db.get("hello").should eq("world")
+  end
+
+  it "should be use block to operate on db" do
+    Ptnk::DB.open do |db|
+      db.put("hello", "world")
+      db.get("hello") 
+    end.should eq("world")
   end
 
   it "should be able to persistently store records" do
@@ -23,7 +30,7 @@ describe Ptnk::DB do
   end
 
   it "should be able to use transaction to store records" do
-    db = Ptnk::DB.new('')
+    db = Ptnk::DB.new
 
     tx = Ptnk::DB::Tx.new(db)
     tx.put("hello", "world", Ptnk::PUT_INSERT)
