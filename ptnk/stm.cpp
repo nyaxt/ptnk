@@ -290,9 +290,9 @@ ActiveOvr::terminate()
 	{
 		currtip = m_lovrVerifiedTip;
 		terminator->m_prev = currtip;
-		__sync_synchronize(); // terminator->m_prev must be set BEFORE tip ptr CAS swing below
+		PTNK_MEMBARRIER_HW; // terminator->m_prev must be set BEFORE tip ptr CAS swing below // FIXME FIXME shouldn't this be compiler memb?
 	}
-	while(! __sync_bool_compare_and_swap(&m_lovrVerifiedTip, currtip, terminator));
+	while(! PTNK_CAS(&m_lovrVerifiedTip, currtip, terminator));
 
 	// 2. merge upto current tip
 	mergeUpto(currtip);
@@ -302,7 +302,7 @@ void
 ActiveOvr::merge(LocalOvr* lovr)
 {
 	// FIXME: really implement the concurrent merge
-	if(! __sync_bool_compare_and_swap(&lovr->m_mergeOngoing, false, true))
+	if(! PTNK_CAS(&lovr->m_mergeOngoing, false, true))
 	{
 		MUTEXPROF_START("wait merge");
 		// wait until merge complete
@@ -361,13 +361,13 @@ ActiveOvr::merge(LocalOvr* lovr)
 		if(laste)
 		{
 			laste->prev = m_hashOvrs[roti];
-			__sync_synchronize(); // laste->prev must be set before tail upd
+			PTNK_MEMBARRIER_HW; // laste->prev must be set before tail upd
 
 			m_hashOvrs[roti] = lovr->m_hashOvrs[roti];
 		}
 	}
 
-	__sync_synchronize(); // m_merged must be set after actual merge finishes
+	PTNK_MEMBARRIER_HW; // m_merged must be set after actual merge finishes
 	lovr->m_merged = true;
 }
 
@@ -423,7 +423,7 @@ ActiveOvr::tryCommit(unique_ptr<LocalOvr>& plovr, commit_flags_t flags, ver_t ve
 				}
 				lovr->m_verWrite = verW;
 			}
-			__sync_synchronize(); // lovr->m_prev must be set BEFORE tip ptr CAS swing below
+			PTNK_MEMBARRIER_HW; // lovr->m_prev must be set BEFORE tip ptr CAS swing below
 
 			// check conflict with txs committed after read snapshot
 			for(LocalOvr* lovrBefore = lovrPrev; lovrBefore && lovrBefore != lovrVerified; lovrBefore = lovrBefore->m_prev)
@@ -454,7 +454,7 @@ ActiveOvr::tryCommit(unique_ptr<LocalOvr>& plovr, commit_flags_t flags, ver_t ve
 			}
 			lovrVerified = lovrPrev;
 
-			if(__sync_bool_compare_and_swap(&m_lovrVerifiedTip, lovrPrev, lovr))
+			if(PTNK_CAS(&m_lovrVerifiedTip, lovrPrev, lovr))
 			{
 				// CAS succeed and _lovr_ has been successfully added to list of verified txs...
 

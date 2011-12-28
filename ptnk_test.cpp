@@ -461,7 +461,7 @@ TEST(ptnk, leaf_bulk)
 		char buf[8];
 		sprintf(buf, "%u", i);
 
-		uint32_t kb = __builtin_bswap32(i); BufferCRef key(&kb, 4);
+		uint32_t kb = PTNK_BSWAP32(i); BufferCRef key(&kb, 4);
 		l.insert(key, cstr2ref(buf), &split, &bOvr, pio.get());
 		if(! split.isValid())
 		{
@@ -472,7 +472,7 @@ TEST(ptnk, leaf_bulk)
 				Buffer buf;
 				sprintf(bufC, "%u", j);
 
-				uint32_t kb2 = __builtin_bswap32(j); BufferCRef key2(&kb2, 4);
+				uint32_t kb2 = PTNK_BSWAP32(j); BufferCRef key2(&kb2, 4);
 				ssize_t s = l.get(key2, buf.wref()); buf.setValsize(s);
 				EXPECT_EQ((ssize_t)::strlen(bufC), s) << "inserted up to " << i << ": incorrect val length for " << j;
 				buf.makeNullTerm();
@@ -508,7 +508,7 @@ TEST(ptnk, leaf_bulk)
 		char bufC[8];
 		sprintf(bufC, "%u", i);
 
-		uint32_t kb = __builtin_bswap32(i); BufferCRef key(&kb, 4);
+		uint32_t kb = PTNK_BSWAP32(i); BufferCRef key(&kb, 4);
 		ssize_t s1 = l.get(key, buf1.wref()); buf1.setValsize(s1);
 		ssize_t s2 = l2.get(key, buf2.wref()); buf2.setValsize(s2);
 		buf1.makeNullTerm(); buf2.makeNullTerm(); 
@@ -876,7 +876,7 @@ TEST(ptnk, leaf_update_nosplit)
 
 	for(i = 0; i < 30; ++ i)
 	{
-		uint32_t kb = __builtin_bswap32(i); BufferCRef key(&kb, 4);
+		uint32_t kb = PTNK_BSWAP32(i); BufferCRef key(&kb, 4);
 		char buf[8]; sprintf(buf, "%u", i);
 
 		l.insert(key, cstr2ref(buf), &split, &bOvr, pio.get());
@@ -888,7 +888,7 @@ TEST(ptnk, leaf_update_nosplit)
 	Buffer v;
 	for(i = 0; i < 30; ++ i)
 	{
-		uint32_t kb = __builtin_bswap32(i); BufferCRef key(&kb, 4);
+		uint32_t kb = PTNK_BSWAP32(i); BufferCRef key(&kb, 4);
 
 		v.setValsize(l.get(key, v.wref()));
 		v.makeNullTerm();
@@ -903,7 +903,7 @@ TEST(ptnk, leaf_update_nosplit)
 
 	// update samesize
 	{
-		uint32_t kb = __builtin_bswap32(15); BufferCRef key(&kb, 4);
+		uint32_t kb = PTNK_BSWAP32(15); BufferCRef key(&kb, 4);
 		l.update(key, cstr2ref("xx"), &split, &bOvr, pio.get());
 
 		EXPECT_FALSE(split.isValid());
@@ -911,7 +911,7 @@ TEST(ptnk, leaf_update_nosplit)
 
 	for(i = 0; i < 30; ++ i)
 	{
-		uint32_t kb = __builtin_bswap32(i); BufferCRef key(&kb, 4);
+		uint32_t kb = PTNK_BSWAP32(i); BufferCRef key(&kb, 4);
 
 		v.setValsize(l.get(key, v.wref()));
 		v.makeNullTerm();
@@ -934,7 +934,7 @@ TEST(ptnk, leaf_update_nosplit)
 	
 	// update null 
 	{
-		uint32_t kb = __builtin_bswap32(15); BufferCRef key(&kb, 4);
+		uint32_t kb = PTNK_BSWAP32(15); BufferCRef key(&kb, 4);
 		l.update(key, BufferCRef::NULL_VAL, &split, &bOvr, pio.get());
 
 		EXPECT_FALSE(split.isValid());
@@ -944,7 +944,7 @@ TEST(ptnk, leaf_update_nosplit)
 
 	for(i = 0; i < 30; ++ i)
 	{
-		uint32_t kb = __builtin_bswap32(i); BufferCRef key(&kb, 4);
+		uint32_t kb = PTNK_BSWAP32(i); BufferCRef key(&kb, 4);
 
 		v.setValsize(l.get(key, v.wref()));
 		v.makeNullTerm();
@@ -967,7 +967,7 @@ TEST(ptnk, leaf_update_nosplit)
 
 	// update to larger val 
 	{
-		uint32_t kb = __builtin_bswap32(15); BufferCRef key(&kb, 4);
+		uint32_t kb = PTNK_BSWAP32(15); BufferCRef key(&kb, 4);
 		l.update(key, cstr2ref("largervalue!!!"), &split, &bOvr, pio.get());
 
 		EXPECT_FALSE(split.isValid());
@@ -976,7 +976,7 @@ TEST(ptnk, leaf_update_nosplit)
 
 	for(i = 0; i < 30; ++ i)
 	{
-		uint32_t kb = __builtin_bswap32(i); BufferCRef key(&kb, 4);
+		uint32_t kb = PTNK_BSWAP32(i); BufferCRef key(&kb, 4);
 
 		v.setValsize(l.get(key, v.wref()));
 		v.makeNullTerm();
@@ -1008,7 +1008,7 @@ TEST(ptnk, leaf_del)
 
 	for(i = 0; i < 30; ++ i)
 	{
-		uint32_t kb = __builtin_bswap32(i); BufferCRef key(&kb, 4);
+		uint32_t kb = PTNK_BSWAP32(i); BufferCRef key(&kb, 4);
 		char buf[8]; sprintf(buf, "%u", i);
 
 		l.insert(key, cstr2ref(buf), &split, &bOvr, pio.get());
@@ -1021,7 +1021,7 @@ TEST(ptnk, leaf_del)
 	Buffer v;
 	for(i = 0; i < 30; ++ i)
 	{
-		uint32_t kb = __builtin_bswap32(i); BufferCRef key(&kb, 4);
+		uint32_t kb = PTNK_BSWAP32(i); BufferCRef key(&kb, 4);
 
 		v.setValsize(l.get(key, v.wref()));
 		v.makeNullTerm();
@@ -1043,7 +1043,7 @@ TEST(ptnk, leaf_del)
 
 	for(i = 0; i < 30; ++ i)
 	{
-		uint32_t kb = __builtin_bswap32(i); BufferCRef key(&kb, 4);
+		uint32_t kb = PTNK_BSWAP32(i); BufferCRef key(&kb, 4);
 
 		v.setValsize(l.get(key, v.wref()));
 		v.makeNullTerm();
@@ -1076,7 +1076,7 @@ TEST(ptnk, leaf_del2)
 
 	for(i = 0; i < 30; ++ i)
 	{
-		uint32_t kb = __builtin_bswap32(i); BufferCRef key(&kb, 4);
+		uint32_t kb = PTNK_BSWAP32(i); BufferCRef key(&kb, 4);
 		char buf[8]; sprintf(buf, "%u", i);
 
 		l.insert(key, cstr2ref(buf), &split, &bOvr, pio.get());
@@ -1087,7 +1087,7 @@ TEST(ptnk, leaf_del2)
 	Buffer v;
 	for(i = 0; i < 30; ++ i)
 	{
-		uint32_t kb = __builtin_bswap32(i); BufferCRef key(&kb, 4);
+		uint32_t kb = PTNK_BSWAP32(i); BufferCRef key(&kb, 4);
 
 		v.setValsize(l.get(key, v.wref()));
 		v.makeNullTerm();
@@ -1108,7 +1108,7 @@ TEST(ptnk, leaf_del2)
 
 		for(i = 0; i < 30; ++ i)
 		{
-			uint32_t kb = __builtin_bswap32(i); BufferCRef key(&kb, 4);
+			uint32_t kb = PTNK_BSWAP32(i); BufferCRef key(&kb, 4);
 
 			v.setValsize(l.get(key, v.wref()));
 			v.makeNullTerm();
@@ -1149,7 +1149,7 @@ TEST(ptnk, leaf_query)
 	btree_split_t split;
 	for(i = 0; i < NUM_KVS; ++ i)
 	{
-		uint32_t kb = __builtin_bswap32(i * 10); BufferCRef key(&kb, 4);
+		uint32_t kb = PTNK_BSWAP32(i * 10); BufferCRef key(&kb, 4);
 
 		char buf[8];
 		sprintf(buf, "%u", i);
@@ -1158,7 +1158,7 @@ TEST(ptnk, leaf_query)
 		if(split.isValid()) break;	
 	}
 
-	static const uint32_t u300 = __builtin_bswap32(300); BufferCRef k300(&u300, 4);
+	static const uint32_t u300 = PTNK_BSWAP32(300); BufferCRef k300(&u300, 4);
 
 	// exact match
 	query_t q;
@@ -1166,7 +1166,7 @@ TEST(ptnk, leaf_query)
 	q.type = MATCH_EXACT;
 	q.key = BufferCRef(&kb, 4);
 	{
-		kb = __builtin_bswap32(300);
+		kb = PTNK_BSWAP32(300);
 
 		btree_cursor_t cur; cur.leaf = l;
 		Buffer key, value;
@@ -1183,7 +1183,7 @@ TEST(ptnk, leaf_query)
 	// match or prev
 	q.type = MATCH_OR_PREV;
 	{
-		kb = __builtin_bswap32(300);
+		kb = PTNK_BSWAP32(300);
 
 		btree_cursor_t cur; cur.leaf = l;
 		Buffer key, value;
@@ -1192,18 +1192,18 @@ TEST(ptnk, leaf_query)
 		l.cursorGet(key.wref(), key.pvalsize(), value.wref(), value.pvalsize(), cur);
 
 		EXPECT_TRUE(key.isValid());
-		EXPECT_TRUE(bufeq(k300, key.rref())) << "key != 300 but " << (uint32_t)__builtin_bswap32(*(uint32_t*)key.get());
+		EXPECT_TRUE(bufeq(k300, key.rref())) << "key != 300 but " << (uint32_t)PTNK_BSWAP32(*(uint32_t*)key.get());
 		EXPECT_TRUE(value.isValid());
 		EXPECT_TRUE(bufeq(cstr2ref("30"), value.rref()));
 
-		kb = __builtin_bswap32(301);
+		kb = PTNK_BSWAP32(301);
 
 		l.query(&cur, q);
 		ASSERT_TRUE(cur.isValid());
 		l.cursorGet(key.wref(), key.pvalsize(), value.wref(), value.pvalsize(), cur);
 
 		EXPECT_TRUE(key.isValid());
-		EXPECT_TRUE(bufeq(k300, key.rref())) << "key != 300 but " << (uint32_t)__builtin_bswap32(*(uint32_t*)key.get());
+		EXPECT_TRUE(bufeq(k300, key.rref())) << "key != 300 but " << (uint32_t)PTNK_BSWAP32(*(uint32_t*)key.get());
 		EXPECT_TRUE(value.isValid());
 		EXPECT_TRUE(bufeq(cstr2ref("30"), value.rref()));
 	}
@@ -1211,7 +1211,7 @@ TEST(ptnk, leaf_query)
 	// match or next
 	q.type = MATCH_OR_NEXT;
 	{
-		kb = __builtin_bswap32(300);
+		kb = PTNK_BSWAP32(300);
 
 		btree_cursor_t cur; cur.leaf = l;
 		Buffer key, value;
@@ -1220,18 +1220,18 @@ TEST(ptnk, leaf_query)
 		l.cursorGet(key.wref(), key.pvalsize(), value.wref(), value.pvalsize(), cur);
 
 		EXPECT_TRUE(key.isValid());
-		EXPECT_TRUE(bufeq(k300, key.rref())) << "key != 300 but " << (uint32_t)__builtin_bswap32(*(uint32_t*)key.get());
+		EXPECT_TRUE(bufeq(k300, key.rref())) << "key != 300 but " << (uint32_t)PTNK_BSWAP32(*(uint32_t*)key.get());
 		EXPECT_TRUE(value.isValid());
 		EXPECT_TRUE(bufeq(cstr2ref("30"), value.rref()));
 
-		kb = __builtin_bswap32(298);
+		kb = PTNK_BSWAP32(298);
 
 		l.query(&cur, q);
 
 		l.cursorGet(key.wref(), key.pvalsize(), value.wref(), value.pvalsize(), cur);
 
 		EXPECT_TRUE(key.isValid());
-		EXPECT_TRUE(bufeq(k300, key.rref())) << "key != 300 but " << (uint32_t)__builtin_bswap32(*(uint32_t*)key.get());
+		EXPECT_TRUE(bufeq(k300, key.rref())) << "key != 300 but " << (uint32_t)PTNK_BSWAP32(*(uint32_t*)key.get());
 		EXPECT_TRUE(value.isValid());
 		EXPECT_TRUE(bufeq(cstr2ref("30"), value.rref()));
 	}
@@ -1239,7 +1239,7 @@ TEST(ptnk, leaf_query)
 	// before
 	q.type = BEFORE;
 	{
-		kb = __builtin_bswap32(302);
+		kb = PTNK_BSWAP32(302);
 
 		btree_cursor_t cur; cur.leaf = l;
 		Buffer key, value;
@@ -1248,7 +1248,7 @@ TEST(ptnk, leaf_query)
 		l.cursorGet(key.wref(), key.pvalsize(), value.wref(), value.pvalsize(), cur);
 
 		EXPECT_TRUE(key.isValid());
-		EXPECT_TRUE(bufeq(k300, key.rref())) << "key != 300 but " << (uint32_t)__builtin_bswap32(*(uint32_t*)key.get());
+		EXPECT_TRUE(bufeq(k300, key.rref())) << "key != 300 but " << (uint32_t)PTNK_BSWAP32(*(uint32_t*)key.get());
 		EXPECT_TRUE(value.isValid());
 		EXPECT_TRUE(bufeq(cstr2ref("30"), value.rref()));
 	}
@@ -1256,7 +1256,7 @@ TEST(ptnk, leaf_query)
 	// after
 	q.type = AFTER;
 	{
-		kb = __builtin_bswap32(291);
+		kb = PTNK_BSWAP32(291);
 
 		btree_cursor_t cur; cur.leaf = l;
 		Buffer key, value;
@@ -1265,7 +1265,7 @@ TEST(ptnk, leaf_query)
 		l.cursorGet(key.wref(), key.pvalsize(), value.wref(), value.pvalsize(), cur);
 
 		EXPECT_TRUE(key.isValid());
-		EXPECT_TRUE(bufeq(k300, key.rref())) << "key != 300 but " << (uint32_t)__builtin_bswap32(*(uint32_t*)key.get());
+		EXPECT_TRUE(bufeq(k300, key.rref())) << "key != 300 but " << (uint32_t)PTNK_BSWAP32(*(uint32_t*)key.get());
 		EXPECT_TRUE(value.isValid());
 		EXPECT_TRUE(bufeq(cstr2ref("30"), value.rref()));
 	}
@@ -1575,7 +1575,7 @@ TEST(ptnk, node_bulk)
 		split.reset();
 		split.pgidSplit = i;
 		{
-			uint32_t kb = __builtin_bswap32(split.pgidSplit+1);
+			uint32_t kb = PTNK_BSWAP32(split.pgidSplit+1);
 			split.addSplit(BufferCRef(&kb, 4), i+1);
 		}
 
@@ -1589,7 +1589,7 @@ TEST(ptnk, node_bulk)
 			{
 				query_t q;
 				{
-					uint32_t kb = __builtin_bswap32(j);
+					uint32_t kb = PTNK_BSWAP32(j);
 					q.key = BufferCRef(&kb, 4);
 				}
 				q.type = MATCH_EXACT;
@@ -1617,7 +1617,7 @@ TEST(ptnk, node_bulk)
 	{
 		query_t q;
 		{
-			uint32_t kb = __builtin_bswap32(i);
+			uint32_t kb = PTNK_BSWAP32(i);
 			q.key = BufferCRef(&kb, 4);
 		}
 		q.type = MATCH_EXACT;
@@ -1706,7 +1706,7 @@ TEST(ptnk, node_random)
 		for(i = 0; i < COUNT; ++ i)
 		{
 			int t = ord[i]+1;
-			uint32_t tb = __builtin_bswap32(t);
+			uint32_t tb = PTNK_BSWAP32(t);
 
 			split.reset();
 			{
@@ -1715,7 +1715,7 @@ TEST(ptnk, node_random)
 				q.type = MATCH_EXACT;
 				split.pgidSplit = n.query(q);
 			}
-			uint32_t kb = __builtin_bswap32(t);
+			uint32_t kb = PTNK_BSWAP32(t);
 			split.addSplit(BufferCRef(&kb, 4), t);
 
 			n.handleChildSplit(&split, &bOvr, pio.get());
@@ -1727,7 +1727,7 @@ TEST(ptnk, node_random)
 				for(int j = 0; j < i; ++ j)
 				{
 					unsigned int t = ord[j]+1;
-					uint32_t tb = __builtin_bswap32(t);
+					uint32_t tb = PTNK_BSWAP32(t);
 
 					query_t q;
 					q.key = BufferCRef(&tb, 4);
@@ -1752,7 +1752,7 @@ TEST(ptnk, node_random)
 		for(; i >= 0; -- i)
 		{
 			int t = ord[i]+1;
-			uint32_t tb = __builtin_bswap32(t);
+			uint32_t tb = PTNK_BSWAP32(t);
 
 			query_t q;
 			q.key = BufferCRef(&tb, 4);
@@ -1769,7 +1769,7 @@ TEST(ptnk, node_random)
 		}
 		{
 			unsigned int t = 0;
-			uint32_t tb = __builtin_bswap32(t);
+			uint32_t tb = PTNK_BSWAP32(t);
 
 			query_t q;
 			q.key = BufferCRef(&tb, 4);
@@ -2072,7 +2072,7 @@ TEST(ptnk, btree_cursor_nextprev)
 
 	for(int i = 0; i < NUM_KVS; ++ i)
 	{
-		uint32_t kb = __builtin_bswap32(i); BufferCRef key(&kb, 4);
+		uint32_t kb = PTNK_BSWAP32(i); BufferCRef key(&kb, 4);
 		char buf[8]; sprintf(buf, "%u", i);
 		idRoot = btree_put(idRoot, key, cstr2ref(buf), PUT_INSERT, PGID_INVALID, pio.get());
 	}
@@ -2090,7 +2090,7 @@ TEST(ptnk, btree_cursor_nextprev)
 			cur.get(), pio.get());
 		value.makeNullTerm();
 
-		uint32_t kb = __builtin_bswap32(i);
+		uint32_t kb = PTNK_BSWAP32(i);
 		EXPECT_EQ(kb, *(uint32_t*)key.get());
 
 		char buf[8]; sprintf(buf, "%u", i);
@@ -2108,7 +2108,7 @@ TEST(ptnk, btree_cursor_nextprev)
 			cur.get(), pio.get());
 		value.makeNullTerm();
 
-		uint32_t kb = __builtin_bswap32(i);
+		uint32_t kb = PTNK_BSWAP32(i);
 		EXPECT_EQ(kb, *(uint32_t*)key.get());
 
 		char buf[8]; sprintf(buf, "%u", i);

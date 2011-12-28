@@ -35,7 +35,7 @@ BufferCRef::inspect() const
 		} 
 		else if(size() == 4)
 		{
-			uint32_t i = __builtin_bswap32(*(const uint32_t*)get());
+			uint32_t i = PTNK_BSWAP32(*(const uint32_t*)get());
 			ret << i << "I: ";
 		}
 

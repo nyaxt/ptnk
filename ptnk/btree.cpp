@@ -12,7 +12,7 @@ const char*
 dat2str(BufferCRef buf)
 {
 	static char tmp[32];
-	sprintf(tmp, "%u", __builtin_bswap32(*(int*)buf.get()));
+	sprintf(tmp, "%u", PTNK_BSWAP32(*(int*)buf.get()));
 	return tmp;
 }
 

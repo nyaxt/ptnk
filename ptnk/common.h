@@ -30,6 +30,25 @@
 #define PTNK_UNLIKELY(x)	(x)
 #endif
 
+#define PTNK_STRINGIFY(x) PTNK_STRINGIFY2(x)
+#define PTNK_STRINGIFY2(x) #x
+
+#define PTNK_BSWAP32(x) __builtin_bswap32(x)
+#define PTNK_BSWAP64(x) __builtin_bswap64(x)
+
+#if defined(__GNUC__)
+#define PTNK_MEMBARRIER_COMPILER asm volatile("": : :"memory");
+#define PTNK_MEMBARRIER_HW __sync_synchronize()
+#define PTNK_MEMBARRIER_HW_STORE asm volatile("sfence": : :"memory")
+#define PTNK_MEMBARRIER_HW_LOAD asm volatile("lfence": : :"memory")
+#define PTNK_CAS(ptr, from, to) __sync_bool_compare_and_swap((ptr), (from), (to))
+#elif defined(_MSC_VER)
+#define PTNK_MEMBARRIER_COMPILER _ReadWriteBarrier()
+#define PTNK_MEMBARRIER_HW MemoryBarrier()
+#define PTNK_MEMBARRIER_HW_STORE MemoryBarrier()
+#define PTNK_MEMBARRIER_HW_LOAD MemoryBarrier()
+#endif
+
 #ifdef __cplusplus
 extern "C"
 {

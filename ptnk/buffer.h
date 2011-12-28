@@ -23,7 +23,7 @@ ptnk_memcmp_inl(const void* a, const void* b, size_t s)
 
 	for(;s > 7; s -= 8)
 	{
-		int64_t diff = __builtin_bswap64(*ia++) - __builtin_bswap64(*ib++);
+		int64_t diff = PTNK_BSWAP64(*ia++) - PTNK_BSWAP64(*ib++);
 
 		if(diff > 0)
 		{
@@ -38,7 +38,7 @@ ptnk_memcmp_inl(const void* a, const void* b, size_t s)
 	if(s == 0) return 0;
 	
 	uint8_t sh = (8 - s)*8;
-	int64_t diff = (__builtin_bswap64(*ia << sh) - __builtin_bswap64(*ib << sh));
+	int64_t diff = (PTNK_BSWAP64(*ia << sh) - PTNK_BSWAP64(*ib << sh));
 	if(diff > 0)
 	{
 		return 1;

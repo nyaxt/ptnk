@@ -690,7 +690,7 @@ PartitionedPageIO::newPage()
 		if(!m_isHelperInvoked && ! m_parts[partid+1] && numNeeded > -NPAGES_PREALLOC_THRESHOLD)
 		{
 			// make helper pre-allocate pages
-			if(__sync_bool_compare_and_swap(&m_isHelperInvoked, false, true))
+			if(PTNK_CAS(&m_isHelperInvoked, false, true))
 			{
 				m_helper->enq([this, pgid]() {
 				#ifdef VERBOSE_PAGEIO
@@ -707,7 +707,7 @@ PartitionedPageIO::newPage()
 		}
 #endif
 	}
-	while(! __sync_bool_compare_and_swap(&m_pgidLast, pgidLast, pgid));
+	while(! PTNK_CAS(&m_pgidLast, pgidLast, pgid));
 
 	return make_pair(Page(m_parts[PGID_PARTID(pgid)]->calcPtr(PGID_LOCALID(pgid)), true), pgid);
 }

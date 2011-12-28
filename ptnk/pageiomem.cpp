@@ -254,7 +254,7 @@ RETRY:
 		goto RETRY;
 	}
 
-	if(! __sync_bool_compare_and_swap(&m_idNext, idResv, idResv+1))
+	if(! PTNK_CAS(&m_idNext, idResv, idResv+1))
 	{
 		// reservation failed
 

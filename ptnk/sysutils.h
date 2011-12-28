@@ -19,11 +19,6 @@
 namespace ptnk
 {
 
-#define PTNK_MEMBARRIER_COMPILER asm volatile("": : :"memory"); 
-
-#define PTNK_STRINGIFY(x) PTNK_STRINGIFY2(x)
-#define PTNK_STRINGIFY2(x) #x
-
 class HighResTimeStamp
 {
 public:

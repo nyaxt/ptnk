@@ -182,7 +182,7 @@ TEST(ptnk, stm_multithread_w_conflict)
 			EXPECT_FALSE(t.get());
 
 			committed_tx = i;
-			__sync_synchronize(); // force write committed_tx
+			PTNK_MEMBARRIER_HW; // force write committed_tx
 		}
 		committed_tx = -1; // break loop in the other thread
 	});
@@ -191,7 +191,7 @@ TEST(ptnk, stm_multithread_w_conflict)
 		// wait until tx progress
 		while(committed_tx == -2)
 		{
-			asm volatile("" : : : "memory");
+			PTNK_MEMBARRIER_COMPILER;
 		}
 
 		for(;;)
@@ -201,12 +201,12 @@ TEST(ptnk, stm_multithread_w_conflict)
 			std::unique_ptr<LocalOvr> t(ao.newTx());
 			
 			// - wait till a tx is committed
-			__sync_synchronize(); // make sure we read latest committed_tx below
+			PTNK_MEMBARRIER_HW; // make sure we read latest committed_tx below
 			int x = committed_tx;
 			while(x >= committed_tx)
 			{
 				if(committed_tx == -1) return;
-				asm volatile("" : : : "memory");
+				PTNK_MEMBARRIER_COMPILER;
 			}
 
 			// - do a conflicting change

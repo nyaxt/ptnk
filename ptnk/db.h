@@ -40,17 +40,17 @@ public:
 
 	ssize_t get_k32u(uint32_t nkey, BufferRef value)
 	{
-		uint32_t kb = __builtin_bswap32(nkey); BufferCRef key(&kb, 4);
+		uint32_t kb = PTNK_BSWAP32(nkey); BufferCRef key(&kb, 4);
 		return get(key, value);
 	}
 	void get_k32u(uint32_t nkey, Buffer* value)
 	{
-		uint32_t kb = __builtin_bswap32(nkey); BufferCRef key(&kb, 4);
+		uint32_t kb = PTNK_BSWAP32(nkey); BufferCRef key(&kb, 4);
 		get(key, value);
 	}
 	void put_k32u(uint32_t nkey, BufferCRef value)
 	{
-		uint32_t kb = __builtin_bswap32(nkey); BufferCRef key(&kb, 4);
+		uint32_t kb = PTNK_BSWAP32(nkey); BufferCRef key(&kb, 4);
 		put(key, value);
 	}
 
@@ -91,17 +91,17 @@ public:
 
 		ssize_t get_k32u(uint32_t nkey, BufferRef value)
 		{
-			uint32_t kb = __builtin_bswap32(nkey); BufferCRef key(&kb, 4);
+			uint32_t kb = PTNK_BSWAP32(nkey); BufferCRef key(&kb, 4);
 			return get(key, value);
 		}
 		void get_k32u(uint32_t nkey, Buffer* value)
 		{
-			uint32_t kb = __builtin_bswap32(nkey); BufferCRef key(&kb, 4);
+			uint32_t kb = PTNK_BSWAP32(nkey); BufferCRef key(&kb, 4);
 			get(key, value);
 		}
 		void put_k32u(uint32_t nkey, BufferCRef value)
 		{
-			uint32_t kb = __builtin_bswap32(nkey); BufferCRef key(&kb, 4);
+			uint32_t kb = PTNK_BSWAP32(nkey); BufferCRef key(&kb, 4);
 			put(key, value);
 		}
 

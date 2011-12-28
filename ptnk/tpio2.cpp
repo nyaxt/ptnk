@@ -11,7 +11,7 @@
 namespace ptnk
 {
 
-#define ADDEXACT(V) { unsigned int tmp; do { tmp = V; } while(! __sync_bool_compare_and_swap(&V, tmp, tmp+o.V)); }
+#define ADDEXACT(V) { unsigned int tmp; do { tmp = V; } while(! PTNK_CAS(&V, tmp, tmp+o.V)); }
 #define ADD(V) { V += o.V; }
 
 void
@@ -621,7 +621,7 @@ TPIO2::rebase(bool force)
 
 	if(!force && m_stat.nOvr < REBASE_THRESHOLD) return; // num ovrs below threshold
 
-	if(! __sync_bool_compare_and_swap(&m_bDuringRebase, false, true)) return;
+	if(! PTNK_CAS(&m_bDuringRebase, false, true)) return;
 
 #ifdef VERBOSE_REBASE
 	printf("rebase start\n");
@@ -720,7 +720,7 @@ TPIO2::refreshOldPages(page_id_t threshold, size_t pgsPerTx)
 	//
 
 	if(m_bDuringRefresh) return; // already during refresh
-	if(! __sync_bool_compare_and_swap(&m_bDuringRefresh, false, true)) return;
+	if(! PTNK_CAS(&m_bDuringRefresh, false, true)) return;
 
 #ifdef VERBOSE_REFRESH
 	std::cout << "refresh start" << std::endl << *this;
