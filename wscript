@@ -13,6 +13,7 @@ def options(opt):
 	opt.load('compiler_cxx boost gtest')
 
 	opt.add_option('--with-mtxprof', action='store_true', default=False, help='enable mutex profiling', dest='mtxprof')
+	opt.add_option('--with-stageprof', action='store_true', default=False, help='enable stage profiling', dest='stageprof')
 	opt.add_option('--with-dtrace', action='store_true', default=False, help='enable DTrace/SystemTap probes', dest='dtrace')
 
 def configure(conf):
@@ -30,6 +31,9 @@ def configure(conf):
 
 	if Options.options.mtxprof:
 		conf.env.append_unique('DEFINES', ['PTNK_MUTEXPROF'])
+
+	if Options.options.stageprof:
+		conf.env.append_unique('DEFINES', ['PTNK_STAGEPROF'])
 
 	# posix_fallocate exist?
 	conf.check_cc(fragment='''
@@ -213,6 +217,12 @@ def build(bld):
 			features = 'gtest',
 			use = 'TCMALLOC PTHREAD BOOST_THREAD GTEST ptnk',
 			source = 'ptnk_test.cpp'
+			)
+
+		bld.program(
+			target = 'stageprof_test',
+			use = 'TCMALLOC PTHREAD BOOST_THREAD GTEST ptnk',
+			source = 'stageprof_test.cpp'
 			)
 
 	# bench utils

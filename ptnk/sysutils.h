@@ -1,6 +1,8 @@
 #ifndef _ptnk_sysutils_h_
 #define _ptnk_sysutils_h_
 
+#include "common.h"
+
 #include <vector>
 
 #include <time.h>
@@ -22,18 +24,13 @@ namespace ptnk
 class HighResTimeStamp
 {
 public:
-	HighResTimeStamp(bool doReset = true)
-	{
-		if(doReset) reset();
-	}
-
 #ifdef USE_CLOCK_GETTIME
 	void reset()
 	{
 		::clock_gettime(CLOCK_MONOTONIC, &m_impl);
 	}
 
-	unsigned long elapsed_ns(const HighResTimeStamp& start)
+	unsigned long elapsed_ns(const HighResTimeStamp& start) const
 	{
 		unsigned long ret;
 
@@ -52,7 +49,7 @@ private:
 		m_impl = ::mach_absolute_time();
 	}
 	
-	unsigned long elapsed_ns(const HighResTimeStamp& start)
+	unsigned long elapsed_ns(const HighResTimeStamp& start) const
 	{
 		mach_timebase_info_data_t base; ::mach_timebase_info(&base);
 		return (m_impl - start.m_impl) * base.numer / base.denom;
@@ -66,7 +63,7 @@ private:
 		::gettimeofday(&m_impl, NULL);			
 	}
 
-	unsigned long elapsed_ns(const HighResTimeStamp& start)
+	unsigned long elapsed_ns(const HighResTimeStamp& start) const
 	{
 		unsigned long ret;
 
@@ -105,7 +102,7 @@ private:
 #ifdef PTNK_MUTEXPROF
 #define MUTEXPROF_START(DESCSTR) \
 	static MutexProf prof__(__FILE__ ":" PTNK_STRINGIFY(__LINE__) ":" DESCSTR); \
-	HighResTimeStamp tsBefore(false), tsAfter(false); tsBefore.reset();
+	HighResTimeStamp tsBefore, tsAfter; tsBefore.reset();
 
 #define MUTEXPROF_END \
 	tsAfter.reset(); \
@@ -113,6 +110,21 @@ private:
 #else
 #define MUTEXPROF_START(DESCSTR)
 #define MUTEXPROF_END
+#endif
+
+#ifdef PTNK_STAGEPROF
+extern __thread int g_thr_id;
+constexpr int MAX_NUM_THRS = 32;
+typedef uint32_t stage_t;
+extern stage_t g_curr_stage_th[MAX_NUM_THRS];
+int stageprof_genthrid();
+void stageprof_init();
+void stageprof_dump();
+#define STAGEPROF_STAGE(s) do { if(g_thr_id == 0) { g_thr_id = ptnk::stageprof_genthrid(); } ptnk::g_curr_stage_th[g_thr_id] = (s); } while(0)
+#else
+#define STAGEPROF_STAGE(s)
+#define stageprof_init()
+#define stageprof_dump()
 #endif
 
 bool ptr_valid(void* ptr);
