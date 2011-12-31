@@ -61,6 +61,8 @@ struct put_ary_db
 void
 run_bench()
 {
+	stageprof_init();
+
 	Bench b((boost::format("%1% %2%") % PROGNAME % comment).str());
 	{
 		const int NUM_KEYS_PER_TH = NUM_KEYS / NUM_THREADS;
@@ -88,4 +90,6 @@ run_bench()
 	MutexProf::dumpStatAll();
 	std::cout << "# confl: " << g_confl << std::endl;
 	std::cout << "# keys: " << NUM_KEYS << std::endl;
+
+	stageprof_dump();
 }

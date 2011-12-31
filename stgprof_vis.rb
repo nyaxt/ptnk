@@ -2,7 +2,8 @@
 # coding: utf-8
 
 W = 20
-TSCALE = 1e-4
+HEIGHT = 2000.0
+tscale = 1e-4
 
 def svg_proepi
   puts <<EOS
@@ -35,22 +36,23 @@ svg_proepi do
     case l
     when /^TSEND (\d+)/
       tsend = $1.to_i
+      tscale = HEIGHT / tsend
 
     when /^THREAD (\d+)/
       ts = tsend
-      svg_rect cthr*W, last_ts*TSCALE, W, (ts-last_ts)*TSCALE, last_col if cthr
+      svg_rect cthr*W, last_ts*tscale, W, (ts-last_ts)*tscale, last_col if cthr
 
       cthr = $1.to_i
       last_ts = 0
 
     when /^(\d+), ([0-9a-fA-F]+)/
       ts = $1.to_i
-      svg_rect cthr*W, last_ts*TSCALE, W, (ts-last_ts)*TSCALE, last_col
+      svg_rect cthr*W, last_ts*tscale, W, (ts-last_ts)*tscale, last_col
 
       last_ts = ts
       last_col = $2
     end
   end
-  svg_rect cthr*W, last_ts*TSCALE, W, (tsend-last_ts)*TSCALE, last_col if cthr
+  svg_rect cthr*W, last_ts*tscale, W, (tsend-last_ts)*tscale, last_col if cthr
 
 end

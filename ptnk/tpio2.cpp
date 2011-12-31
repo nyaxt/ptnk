@@ -232,6 +232,8 @@ TPIO2::newTransaction()
 	while(m_bDuringRebase)
 	{
 		MUTEXPROF_START("waitrebase");
+		STAGEPROF_STAGE(0xFF0000);
+
 		boost::unique_lock<boost::mutex> g(m_mtxRebase);
 
 		PTNK_MEMBARRIER_COMPILER;
@@ -240,6 +242,7 @@ TPIO2::newTransaction()
 			m_condRebase.wait(g);
 		}
 		MUTEXPROF_END;
+		STAGEPROF_STAGE(0x000000);
 	}
 
 	shared_ptr<ActiveOvr> aovr;
@@ -256,6 +259,7 @@ TPIO2::syncDelayed(const Vpage_id_t& pagesModified)
 {
 	if(! m_sync) return;
 
+	STAGEPROF_STAGE(0x8B008B);
 #ifdef TXSESSION_BATCH_SYNC
 	if(! pagesModified.empty())
 	{
@@ -285,6 +289,7 @@ TPIO2::syncDelayed(const Vpage_id_t& pagesModified)
 		m_backend->sync(pgid);	
 	}
 #endif
+	STAGEPROF_STAGE(0x000000);
 }
 
 void
@@ -356,10 +361,12 @@ TPIO2::tryCommit(TPIO2TxSession* tx, commit_flags_t flags)
 	ver_t verW;
 	{
 		MUTEXPROF_START("aovr tryCommit");
+		STAGEPROF_STAGE(0xFF00FF);
 		if((verW = tx->m_aovr->tryCommit(tx->m_lovr, flags)) == TXID_INVALID)
 		{
 			return false;
 		}
+		STAGEPROF_STAGE(0xEE7AE9);
 		MUTEXPROF_END;
 	}
 
@@ -372,6 +379,7 @@ TPIO2::tryCommit(TPIO2TxSession* tx, commit_flags_t flags)
 	// 3. fill pages info / write pages to disk
 	commitTxPages(tx, verW, false);
 
+	STAGEPROF_STAGE(0x000000);
 	return true;
 }
 
@@ -627,6 +635,7 @@ TPIO2::rebase(bool force)
 	printf("rebase start\n");
 	std::cout << *this;
 #endif
+	STAGEPROF_STAGE(0x0000FF);
 
 	// 1. refuse further tx to commit
 	m_aovr->terminate();
@@ -687,6 +696,8 @@ TPIO2::rebase(bool force)
 	printf("rebase end verBase: %d\n", m_aovr->verBase());
 	std::cout << *this;
 #endif
+
+	STAGEPROF_STAGE(0x000000);
 }
 
 void
