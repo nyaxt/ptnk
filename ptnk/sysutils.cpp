@@ -105,6 +105,24 @@ checkperm(const char* filename, int flags)
 	}
 }
 
+void
+thread_makerealtime(pthread_t thr)
+try
+{
+	int policy;
+	struct sched_param param;
+	PTNK_ASSURE_SYSCALL(pthread_getschedparam(thr, &policy, &param));
+
+	policy = SCHED_RR;
+	param.sched_priority = 64;
+
+	PTNK_ASSURE_SYSCALL(pthread_setschedparam(thr, policy, &param));
+}
+catch(std::exception& e)
+{
+	std::cout << "thread_makerealtime failed: " << e.what() << std::endl;	
+}
+
 #ifdef PTNK_STAGEPROF
 
 stage_t g_curr_stage_th[MAX_NUM_THRS];
@@ -174,6 +192,7 @@ stageprof_init()
 	}
 
 	g_thr_stageprof.reset(new std::thread(stageprof_thr_main));
+	thread_makerealtime(g_thr_stageprof->native_handle());
 }
 
 void
