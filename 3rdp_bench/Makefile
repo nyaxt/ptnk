@@ -1,6 +1,6 @@
 CXX=g++
 HGNUM=$(shell hg id -n)
-CXXFLAGS=-I/opt/local/include -I../build -Wall -DHGNUM="\"$(HGNUM)\"" -ggdb -O4
+CXXFLAGS=-std=c++0x -I/opt/local/include -I../build -Wall -DHGNUM="\"$(HGNUM)\"" -ggdb -O4
 LDFLAGS=-L/opt/local/lib -L/usr/local/lib -lpthread -lgtest -lrt
 
 TARGETS=kc_bench bdb_bench haildb_bench luxio_bench leveldb_bench
@@ -22,7 +22,7 @@ luxio_bench: luxio_bench.cpp ../bench.h ../bench_tmpl.h
 	$(CXX) $(CXXFLAGS) $(LDFLAGS) -lluxio -o $@ $<
 
 leveldb_bench: leveldb_bench.cpp ../bench.h ../bench_tmpl.h
-	$(CXX) -L/home/kouhei/work/leveldb -I/home/kouhei/work/leveldb/include $(CXXFLAGS) $(LDFLAGS) -o $@ $< -lleveldb
+	$(CXX) -L/home/kouhei/src/leveldb -I/home/kouhei/src/leveldb/include $(CXXFLAGS) $(LDFLAGS) -o $@ $< -lleveldb
 
 clean:
 	rm $(TARGETS)
