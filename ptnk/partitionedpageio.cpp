@@ -238,16 +238,21 @@ MappedFile::expandFile(size_t pgs)
 		MUTEXPROF_START("fallocate");
 		size_t allocsize = pgs * PTNK_PAGE_SIZE;
 	#ifdef USE_POSIX_FALLOCATE
-		int ret;
-		if(0 != (ret = ::posix_fallocate(m_fd, m_numPagesReserved * PTNK_PAGE_SIZE, allocsize)))
-		{
-			throw ptnk_syscall_error(__FILE__, __LINE__, "posix_fallocate", ret);
-		}
-	#else
+	 	int ret;
+	 	if(0 != (ret = ::posix_fallocate(m_fd, m_numPagesReserved * PTNK_PAGE_SIZE, allocsize)))
+	 	{
+	 		throw ptnk_syscall_error(__FILE__, __LINE__, "posix_fallocate", ret);
+	 	}
+	#elif defined(USE_FTRUNCATE)
+		(void) allocsize;
+		PTNK_ASSURE_SYSCALL(::ftruncate(m_fd, (m_numPagesReserved + pgs) * PTNK_PAGE_SIZE));
+	#elif defined(USE_PWRITE)
 		// expand file first
 		unique_ptr<char> buf(new char[allocsize + PTNK_PAGE_SIZE]);
 		PTNK_ASSURE_SYSCALL(::pwrite(m_fd, buf.get(), allocsize, m_numPagesReserved * PTNK_PAGE_SIZE));
 		PTNK_ASSURE_SYSCALL(::fsync(m_fd));
+	#else
+		#error no file expand method defined
 	#endif
 		MUTEXPROF_END;
 	}
@@ -284,21 +289,20 @@ MappedFile::sync(local_pgid_t pgidStart, local_pgid_t pgidEnd)
 	Mapping* m = &m_mapFirst;
 	while(m)
 	{
-		if(pgidEnd < m->pgidEnd)
+		if(pgidEnd > m->pgidEnd)
 		{
-			size_t off = m->offset + PTNK_PAGE_SIZE * pgidStart;
+			intptr_t off = reinterpret_cast<intptr_t>(m->offset) + PTNK_PAGE_SIZE * pgidStart;
 			size_t len = PTNK_PAGE_SIZE * (m->pgidEnd - pgidStart);
-			PTNK_ASSURE_SYSCALL(::msync(off, len, MS_SYNC | MS_INVALIDATE));
+			PTNK_ASSURE_SYSCALL(::msync((void*)off, len, MS_SYNC));
 
 			pgidStart = m->pgidEnd;
 			m = m->next.get();
-			if(! m) break; // FIXME: obviously not needed
 		}
 		else
 		{
-			size_t off = m->offset + PTNK_PAGE_SIZE * pgidStart;
-			size_t len = PTNK_PAGE_SIZE * (pgidEnd- pgidStart + 1);
-			PTNK_ASSURE_SYSCALL(::msync(off, len, MS_SYNC | MS_INVALIDATE));
+			intptr_t off = reinterpret_cast<intptr_t>(m->offset) + PTNK_PAGE_SIZE * pgidStart;
+			size_t len = PTNK_PAGE_SIZE * (pgidEnd - pgidStart + 1);
+			PTNK_ASSURE_SYSCALL(::msync((void*)off, len, MS_SYNC));
 
 			break;	
 		}
