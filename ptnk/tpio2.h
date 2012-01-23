@@ -28,6 +28,7 @@ struct TPIOStat
 	unsigned int nNotifyOldLink;
 
 	TPIOStat() :
+		nUniquePages(0),
 		nRead(0),
 		nReadOvr(0),
 		nReadOvrLocal(0),

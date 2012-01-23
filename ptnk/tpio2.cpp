@@ -11,12 +11,12 @@
 namespace ptnk
 {
 
-#define ADDEXACT(V) { unsigned int tmp; do { tmp = V; } while(! PTNK_CAS(&V, tmp, tmp+o.V)); }
-#define ADD(V) { V += o.V; }
-
 void
 TPIOStat::merge(const TPIOStat& o)
 {
+#define ADDEXACT(V) { volatile unsigned int tmp; do { PTNK_MEMBARRIER_COMPILER; tmp = V; } while(! PTNK_CAS(&V, tmp, tmp+o.V)); }
+#define ADD(V) { V += o.V; }
+
 	ADDEXACT(nUniquePages)
 	ADD(nRead)
 	ADD(nReadOvr)
@@ -25,6 +25,9 @@ TPIOStat::merge(const TPIOStat& o)
 	ADD(nOvr)
 	ADD(nSync)
 	ADD(nNotifyOldLink)
+
+#undef ADDEXACT
+#undef ADD
 }
 
 void
@@ -71,9 +74,7 @@ TPIO2TxSession::newPage()
 {
 	++ m_stat.nUniquePages;
 
-	pair<Page, page_id_t> ret = backend()->newPage();
-
-	return ret;
+	return backend()->newPage();
 }
 
 Page
@@ -126,8 +127,7 @@ TPIO2TxSession::modifyPage(const Page& page, mod_info_t* mod)
 		mod->idOrig = page.pageOrigId();
 
 		Page ovr;
-		tie(ovr, mod->idOvr) = newPage();
-		-- m_stat.nUniquePages;
+		tie(ovr, mod->idOvr) = backend()->newPage();
 
 		MUTEXPROF_START("makePageOvr");
 		ovr.makePageOvr(page, mod->idOvr);

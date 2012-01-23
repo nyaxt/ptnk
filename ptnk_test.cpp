@@ -2971,6 +2971,15 @@ TEST(ptnk, TPIO_refreshOldPages_basic)
 	}
 }
 
+TEST(ptnk, nUniquePages)
+{
+	DB db;
+
+	db.put(cstr2ref("key"), cstr2ref("value"));
+
+	EXPECT_EQ(3, db.tpio_()->stat().nUniquePages);
+}
+
 TEST(ptnk, tx_single_key_put_get)
 {
 	DB db;
@@ -3532,6 +3541,7 @@ TEST(ptnk, save_load)
 	const int NUM_KEYS = 100;
 
 	// create dbfile
+	unsigned int nuni;
 	{
 		ptnk_opts_t opts = OWRITER | OCREATE | OTRUNCATE | OAUTOSYNC;
 		DB db("./_testtmp/savetest.ptnk", opts);
@@ -3550,6 +3560,8 @@ TEST(ptnk, save_load)
 			EXPECT_TRUE(tx->tryCommit());
 		}
 		db.dumpStat();
+
+		nuni = db.tpio_()->stat().nUniquePages;
 	}
 	
 	// load dbfile
@@ -3559,6 +3571,8 @@ TEST(ptnk, save_load)
 
 		db.dumpStat();
 		// db.dumpAll();
+		
+		EXPECT_EQ(nuni, db.tpio_()->stat().nUniquePages);
 
 		unique_ptr<DB::Tx> tx(db.newTransaction());
 
