@@ -3692,7 +3692,7 @@ TEST(ptnk, PartitionedPageIO_basic)
 {
 	t_mktmpdir("./_testtmp");
 
-	PartitionedPageIO pio("./_testtmp/ppio_basic", OWRITER | OCREATE | OTRUNCATE);
+	PartitionedPageIO pio("./_testtmp/ppio_basic", OWRITER | OCREATE | OTRUNCATE | OPARTITIONED);
 
 	Page pg; page_id_t pgid;
 	tie(pg, pgid) = pio.newPage();

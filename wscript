@@ -165,6 +165,7 @@ def build(bld):
 		ptnk/buffer.cpp
 		ptnk/page.cpp
 		ptnk/pageio.cpp
+		ptnk/mappedfile.cpp
 		ptnk/pageiomem.cpp
 		ptnk/partitionedpageio.cpp
 		ptnk/btree.cpp

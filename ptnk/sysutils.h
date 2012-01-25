@@ -127,6 +127,11 @@ void stageprof_dump();
 #define stageprof_dump()
 #endif
 
+inline bool strempty(const char* str)
+{
+	return !str || *str == '\0';
+}
+
 bool ptr_valid(void* ptr);
 bool file_exists(const char* sysname);
 bool checkperm(const char* sysname, int flags);

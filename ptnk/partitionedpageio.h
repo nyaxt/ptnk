@@ -11,112 +11,6 @@
 namespace ptnk
 {
 
-class MappedFile
-{
-public:
-	static MappedFile* openExisting(part_id_t partid, const char* filename, ptnk_opts_t opts);
-	static MappedFile* createNew(part_id_t partid, const char* filename, ptnk_opts_t opts, int mode);
-	~MappedFile();
-
-	char* calcPtr(local_pgid_t pgid);
-	void sync(local_pgid_t pgidStart, local_pgid_t pgidEnd);
-
-	bool isReadOnly() const { return m_isReadOnly; }
-	void makeReadOnly();
-
-	//! alloc more pages by expanding filesize and mapped region
-	/*!
-	 *	@return number of actually alloced pages (0 if none alloced)
-	 */
-	size_t expandFile(size_t pgs);
-
-	size_t numPagesReserved() const
-	{
-		return m_numPagesReserved;	
-	}
-
-	part_id_t partid() const
-	{
-		return m_partid;	
-	}
-
-	const std::string& filename() const
-	{
-		return m_filename;
-	}
-
-	void discardFile();
-
-	bool isFile() const
-	{
-		return ! m_filename.empty();	
-	}
-
-	void dump(std::ostream& s) const;
-	
-private:
-	//! struct corresponding to mmap-ed region (linked list)
-	struct Mapping
-	{
-		//! prev.pgidEnd <= pgid < pgidEnd is mapped
-		page_id_t pgidEnd;
-
-		char* offset;
-
-		//! ptr to next mapping
-		unique_ptr<Mapping> next;
-	};
-
-	MappedFile(part_id_t partid, const char* filename, int fd, int prot);
-
-	//! mmap more pages (does NOT expand file size)
-	void moreMMap(size_t pgs);
-
-	//! partition id
-	part_id_t m_partid;
-
-	//! path of file responsible for this partition
-	/*!
-	 *	empty if not mapped to file (just mem)
-	 */
-	std::string m_filename;
-
-	//! opened file descriptor
-	int m_fd;
-
-	//! prot passed to mmap(2)
-	int m_prot;
-
-	//! true if this part is mmap-ed read-only
-	bool m_isReadOnly;
-
-	//! first mmap-ed region
-	Mapping m_mapFirst;
-
-	Mapping* getmLast();
-
-	local_pgid_t m_numPagesReserved;
-};
-inline
-std::ostream& operator<<(std::ostream& s, const MappedFile& o)
-{ o.dump(s); return s; }
-
-inline
-char*
-MappedFile::calcPtr(local_pgid_t pgid)
-{
-	for(Mapping* p = &m_mapFirst; p; p = p->next.get())
-	{
-		if(PTNK_LIKELY(pgid < p->pgidEnd))
-		{
-			return p->offset + PTNK_PAGE_SIZE * pgid;
-		}
-	}
-
-	PTNK_CHECK(false);
-	return NULL;
-}
-
 class Helper;
 
 class PartitionedPageIO : public PageIO
@@ -181,7 +75,7 @@ private:
 	 */
 	void addNewPartition_unsafe();
 
-	void scanLastPgId(part_id_t partidLatest);
+	void scanLastPgId(part_id_t partidLatest); // FIXME: why partidLatest is needed???
 
 	//! alloc more pages
 	void expandTo(page_id_t pgid);

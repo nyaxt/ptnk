@@ -22,11 +22,10 @@ DB::DB(const char* filename, ptnk_opts_t opts, int mode)
 		m_helper.reset(new Helper);	
 	}
 
-	if(filename && *filename != '\0' && (opts & OPARTITIONED))
+	if(! strempty(filename) && (opts & OPARTITIONED))
 	{
 		PartitionedPageIO* ppio;
 		m_pio.reset((ppio = new PartitionedPageIO(filename, opts, mode)));
-
 		if(m_helper) ppio->attachHelper(m_helper.get());
 	}
 	else
