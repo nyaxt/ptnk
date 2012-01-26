@@ -2,6 +2,7 @@
 #include "sysutils.h"
 
 #include <iomanip>
+#include <iostream>
 #include <sstream>
 
 #include <stdio.h>
