@@ -3875,7 +3875,7 @@ TEST(ptnk, PageIOMem_multithread)
 TEST(ptnk, PartitionedPageIO_multithread)
 {
 	t_mktmpdir("./_testtmp");
-	unique_ptr<PageIO> pio(new PartitionedPageIO("./_testtmp/mt", OWRITER | OCREATE | OTRUNCATE));
+	unique_ptr<PageIO> pio(new PartitionedPageIO("./_testtmp/mt", OWRITER | OCREATE | OTRUNCATE | OPARTITIONED));
 	
 	const int NUM_THREAD = 10;
 	const size_t PG_PER_THREAD = 10000;

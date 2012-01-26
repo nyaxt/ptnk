@@ -25,6 +25,7 @@ PageIOMem::PageIOMem(const char* filename, ptnk_opts_t opts, int mode)
 	if(strempty(filename))
 	{
 		// in-mem db
+		PTNK_CHECK_CMNT(opts & OWRITER, "in-mem db can't be used read-only");
 		m_mf = std::unique_ptr<MappedFile>(MappedFile::createMem());
 
 		m_isFile = false;
@@ -100,7 +101,9 @@ PageIOMem::expandTo(page_id_t pgid)
 {
 	std::unique_lock<std::mutex> g(m_mtxAlloc);
 
-	ssize_t numNeeded = pgid - m_mf->numPagesReserved() + 1;
+	ssize_t numNeeded = static_cast<ssize_t>(pgid) - m_mf->numPagesReserved() + 1;
+	if(numNeeded <= 0) return;
+
 	m_mf->expandFile(numNeeded);
 }
 
@@ -116,7 +119,7 @@ PageIOMem::newPage()
 
 		pgid = pgidLast + 1;
 
-		ssize_t numNeeded = pgid - m_mf->numPagesReserved() + 1;
+		ssize_t numNeeded = static_cast<ssize_t>(pgid) - m_mf->numPagesReserved() + 1;
 		if(numNeeded > 0)
 		{
 			// need more pages...

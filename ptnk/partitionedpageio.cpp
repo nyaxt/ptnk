@@ -59,13 +59,6 @@ PartitionedPageIO::PartitionedPageIO(const char* dbprefix, ptnk_opts_t opts, int
 			m_needInit = false;	
 		}
 	}
-
-	{
-		PTNK_CHECK_CMNT(opts & OWRITER, "in-mem db can't be used read-only");
-
-		// in-mem db
-		m_parts[0] = unique_ptr<MappedFile>(MappedFile::createMem());
-	}
 }
 
 void
