@@ -6,6 +6,7 @@
 #include "ptnk/types.h"
 #include "ptnk/exceptions.h"
 #include "ptnk/buffer.h"
+#include "ptnk/mappedfile.h"
 #include "ptnk/pageiomem.h"
 #include "ptnk/btree.h"
 #include "ptnk/btree_int.h"
@@ -19,6 +20,9 @@
 #include <stdlib.h>
 #include <fcntl.h>
 #include <unistd.h>
+#include <sys/mman.h>
+#include <sys/stat.h>
+#include <sys/types.h>
 
 #include <dirent.h>
 #include <sys/types.h>
@@ -408,6 +412,83 @@ dumpGraphBinTree(const Page& pg, PageIO* pio, const char* filename)
 	pg.dumpGraph(fp, pio);
 	fprintf(fp, "}");
 	fclose(fp);
+}
+
+TEST(ptnk, PageIOMem_discardOldPages)
+{
+	unique_ptr<PageIO> pio(new PageIOMem);
+
+	{
+		Page pg; page_id_t pgid;
+		tie(pg, pgid) = pio->newPage();
+
+		EXPECT_TRUE(ptr_valid(pg.getRaw()));
+		EXPECT_EQ(0, pgid);
+	}
+
+	{
+		Page pg; page_id_t pgid;
+		tie(pg, pgid) = pio->newPage();
+
+		EXPECT_TRUE(ptr_valid(pg.getRaw()));
+		EXPECT_EQ(1, pgid);
+	}
+
+	pio->discardOldPages(1);
+
+	{
+		Page pg = pio->readPage(0);
+
+		EXPECT_FALSE(ptr_valid(pg.getRaw()));
+	}
+	{
+		Page pg = pio->readPage(1);
+
+		EXPECT_TRUE(ptr_valid(pg.getRaw()));
+	}
+}
+
+TEST(ptnk, PageIOMem_discardOldPages2)
+{
+	MappedFile::resetHint_();
+
+	unique_ptr<PageIO> pio(new PageIOMem);
+
+	for(int i = 0; i < NPAGES_PREALLOC; ++ i)
+	{
+		Page pg; page_id_t pgid;
+		tie(pg, pgid) = pio->newPage();
+
+		EXPECT_TRUE(ptr_valid(pg.getRaw()));
+		EXPECT_EQ(i, pgid);
+	}
+
+	PTNK_ASSURE_SYSCALL_NEQ(::mmap(PTNK_MMAP_HINT + PTNK_PAGE_SIZE * NPAGES_PREALLOC, 0x1000, PROT_READ | PROT_WRITE, MAP_SHARED | MAP_ANON, -1, 0), MAP_FAILED);
+
+	for(int i = NPAGES_PREALLOC; i < NPAGES_PREALLOC + 10; ++ i)
+	{
+		Page pg; page_id_t pgid;
+		tie(pg, pgid) = pio->newPage();
+
+		EXPECT_TRUE(ptr_valid(pg.getRaw()));
+		EXPECT_EQ(i, pgid);
+	}
+
+	pio->discardOldPages(NPAGES_PREALLOC + 5);
+
+	int i = 0;
+	for(; i < NPAGES_PREALLOC + 5; ++ i)
+	{
+		Page pg = pio->readPage(i);
+
+		// EXPECT_FALSE(ptr_valid(pg.getRaw())) << "invalid pg " << i;
+	}
+	for(; i < NPAGES_PREALLOC + 10; ++ i)
+	{
+		Page pg = pio->readPage(i);
+
+		EXPECT_TRUE(ptr_valid(pg.getRaw())) << "valid pg " << i;
+	}
 }
 
 TEST(ptnk, BinTree_dump)

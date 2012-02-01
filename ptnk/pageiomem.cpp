@@ -215,6 +215,12 @@ PageIOMem::needInit() const
 }
 
 void
+PageIOMem::discardOldPages(page_id_t threshold)
+{
+	m_mf->unmap(threshold);
+}
+
+void
 PageIOMem::dump(std::ostream& s) const
 {
 	s << "** PageIOMem stat dump **" << std::endl;

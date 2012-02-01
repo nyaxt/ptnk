@@ -13,6 +13,8 @@
 #include <sys/stat.h>
 #include <sys/types.h>
 
+#define VERBOSE_UNMAP
+
 namespace ptnk
 {
 
@@ -123,16 +125,13 @@ MappedFile::MappedFile(part_id_t partid, const std::string& filename, int fd, in
 MappedFile::~MappedFile()
 {
 	// unmap mmap(2)s
-	page_id_t prevEnd = 0;
 	for(Mapping* m = &m_mapFirst; m; m = m->next.get())
 	{
 		if(m->offset)
 		{
-			size_t len = (m->pgidEnd - prevEnd) * PTNK_PAGE_SIZE;
-			::munmap(m->offset, len);
+			size_t len = (m->pgidEnd - m->pgidStart) * PTNK_PAGE_SIZE;
+			::munmap(m->offset + PTNK_PAGE_SIZE * m->pgidStart, len);
 		}
-
-		prevEnd = m->pgidEnd;
 	}
 	
 	// close file
@@ -154,14 +153,14 @@ MappedFile::getmLast()
 	return p;
 }
 
+char* MappedFile::s_lastmapend = PTNK_MMAP_HINT; // note: may have consistency issue, but this is only a hint and mmap would work correctly even with wrong info.
+
 void
 MappedFile::moreMMap(size_t pgs)
 {
 	MUTEXPROF_START("moreMMap");
 	Mapping* mLast = getmLast();
 
-	static char* s_lastmapend = PTNK_MMAP_HINT;
-	char* mapstart;
 	char* hint;
 	if(mLast->offset)
 	{
@@ -172,6 +171,7 @@ MappedFile::moreMMap(size_t pgs)
 		hint = s_lastmapend;
 	}
 
+	char* mapstart;
 	if(! m_bInMem)
 	{
 		PTNK_ASSURE_SYSCALL_NEQ(
@@ -192,8 +192,8 @@ MappedFile::moreMMap(size_t pgs)
 			std::cerr << "m_fd: " << m_fd<< std::endl;	
 		};
 	}
-	PTNK_CHECK(mapstart);
-	s_lastmapend = mapstart + PTNK_PAGE_SIZE*pgs;
+	PTNK_CHECK_CMNT(mapstart, "mmap returned NULL");
+	s_lastmapend = mapstart + PTNK_PAGE_SIZE*pgs; // update hint
 
 	if(!mLast->offset || mapstart == hint)
 	{
@@ -210,6 +210,7 @@ MappedFile::moreMMap(size_t pgs)
 		// add new mapping
 		unique_ptr<Mapping> mNew(new Mapping);
 
+		mNew->pgidStart = mLast->pgidEnd;
 		mNew->pgidEnd = mLast->pgidEnd + pgs;
 		mNew->offset = mapstart - mLast->pgidEnd * PTNK_PAGE_SIZE;
 
@@ -331,21 +332,63 @@ MappedFile::dump(std::ostream& o) const
 	o << "- partition id: " << std::hex << std::setw(3) << partid() << std::dec << std::endl;	
 	o << std::setfill(' ');
 	o << "  filename: " << m_filename << std::endl;	
-
-	const Mapping* m = &m_mapFirst;
-	while(m)
+	
+	for(const Mapping* m = &m_mapFirst; m; m = m->next.get())
 	{
-		o << "  | map pgidEnd: " << m->pgidEnd << " offset: " << (void*)m->offset << std::endl;
-		m = m->next.get();
+		o << "  | map pgidStart: " << m->pgidStart << " pgidEnd: " << m->pgidEnd << " offset: " << (void*)m->offset << " starting from: " << (void*)(m->offset + PTNK_PAGE_SIZE * m->pgidStart) << std::endl;
+	}
+}
+
+void
+MappedFile::unmap(page_id_t threshold)
+{
+#ifdef VERBOSE_UNMAP
+	std::cout << *this;
+	std::cout << "unmapping to " << pgid2str(threshold) << std::endl;
+#endif
+	for(Mapping* m = &m_mapFirst; m; m = m->next.get())
+	{
+		if(threshold < m->pgidEnd)
+		{
+			if(threshold > m->pgidStart && m->offset)
+			{
+				size_t len = (threshold - m->pgidStart) * PTNK_PAGE_SIZE;
+				PTNK_ASSURE_SYSCALL(::munmap(m->offset + m->pgidStart * PTNK_PAGE_SIZE, len));
+			}
+
+			m->pgidStart = threshold;
+#ifdef VERBOSE_UNMAP
+			std::cout << "unmap done" << std::endl;
+			std::cout << *this;
+#endif
+			return;
+		}
+		else
+		{
+			if(! m->offset) continue;
+
+			size_t len = (m->pgidEnd - m->pgidStart) * PTNK_PAGE_SIZE;
+			PTNK_ASSURE_SYSCALL(::munmap(m->offset + m->pgidStart * PTNK_PAGE_SIZE, len));
+
+			m->offset = nullptr;
+			m->pgidStart = m->pgidEnd;
+		}
 	}
 }
 
 void
 MappedFile::discardFile()
 {
+	// note: This does not include ::unmap / ::close of file, but unlink-ing open-ed file should cause no prob.
+
 	std::cerr << "discarding old partition file: " << m_filename << std::endl;
 	PTNK_ASSURE_SYSCALL(::unlink(m_filename.c_str()));
 }
 
+void
+MappedFile::resetHint_()
+{
+	s_lastmapend = PTNK_MMAP_HINT;
+}
 
 } // end of namespace ptnk

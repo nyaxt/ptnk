@@ -70,16 +70,25 @@ public:
 		return m_filename;
 	}
 
+	void unmap(local_pgid_t threshold);
 	void discardFile();
 
 	void dump(std::ostream& s) const;
+
+	static void resetHint_();
 	
 private:
 	//! struct corresponding to mmap-ed region (linked list)
 	struct Mapping
 	{
-		//! prev.pgidEnd <= pgid < pgidEnd is mapped
-		page_id_t pgidEnd;
+		//! pgidStart <= pgid < pgidEnd is mapped
+		/*!
+		 *	@note
+		 *	  Usually, pgidStart == prev.pgidEnd.
+		 *	  However, it is not the case when unmap is performed.
+		 *	  pgidStart is only used for altering mappings and is not used in calcPtr lookup.
+		 */
+		page_id_t pgidStart, pgidEnd;
 
 		char* offset;
 
@@ -91,6 +100,9 @@ private:
 
 	//! mmap more pages (does NOT expand file size)
 	void moreMMap(size_t pgs);
+
+	//! get last Mapping* in linked list
+	Mapping* getmLast();
 
 	//! partition id
 	part_id_t m_partid;
@@ -116,9 +128,13 @@ private:
 	//! first mmap-ed region
 	Mapping m_mapFirst;
 
-	Mapping* getmLast();
-
 	local_pgid_t m_numPagesReserved;
+
+	//! pointer to end of last mmap-ed region
+	/*
+	 * used for hint for contiguous mmap
+	 */
+	static char* s_lastmapend;
 };
 inline
 std::ostream& operator<<(std::ostream& s, const MappedFile& o)
@@ -139,7 +155,6 @@ MappedFile::calcPtr(local_pgid_t pgid)
 	PTNK_CHECK(false);
 	return NULL;
 }
-
 
 } // end of namespace ptnk
 

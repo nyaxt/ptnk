@@ -56,7 +56,7 @@ ptr_valid(void* ptr)
 
 	unsigned char t;
 	// FIXME below code assumes pagesize == 4096. use sysconf to obtain correct value
-	if(::mincore((void*)((uintptr_t)ptr & ~(uintptr_t)0xfff), 0xfff, &t) == 0)
+	if(::mincore((void*)((uintptr_t)ptr & ~(uintptr_t)0xfff), 0x1000, &t) == 0)
 	{
 		return true;
 	}

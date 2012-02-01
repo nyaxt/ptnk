@@ -273,7 +273,7 @@ PartitionedPageIO::addNewPartition_unsafe()
 void
 PartitionedPageIO::expandTo(page_id_t pgid)
 {
-	boost::unique_lock<boost::mutex> g(m_mtxAlloc);
+	std::lock_guard<std::mutex> g(m_mtxAlloc);
 
 	#ifdef VERBOSE_PAGEIO
 	std::cout << "old pgid max: " << pgid2str(PGID_PARTLOCAL(m_partidLast, m_parts[m_partidLast]->numPagesReserved())) << std::endl;
@@ -463,7 +463,7 @@ PartitionedPageIO::newPart(bool bForce)
 
 	// FIXME: remount old part as read-only
 
-	boost::unique_lock<boost::mutex> g(m_mtxAlloc);
+	std::lock_guard<std::mutex> g(m_mtxAlloc);
 	
 	// re-check! (new part may be created while waiting on m_mtxAlloc)
 	MappedFile* oldpart = m_parts[m_partidLast].get();

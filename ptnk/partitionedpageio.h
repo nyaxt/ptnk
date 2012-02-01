@@ -3,7 +3,7 @@
 
 #include <array>
 
-#include <boost/thread.hpp>
+#include <thread>
 
 #include "pageio.h"
 #include "pageiomem.h"
@@ -93,7 +93,7 @@ private:
 
 	std::array<unique_ptr<MappedFile>, PTNK_PARTID_MAX+2> m_parts;
 
-	boost::mutex m_mtxAlloc;
+	std::mutex m_mtxAlloc;
 
 	//! last alloc-ed pgid
 	volatile page_id_t m_pgidLast;

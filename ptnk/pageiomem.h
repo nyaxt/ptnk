@@ -27,6 +27,8 @@ public:
 
 	virtual bool needInit() const;
 
+	virtual void discardOldPages(page_id_t threshold);
+
 	void dump(std::ostream& s) const;
 	void dumpStat() const;
 
