@@ -241,7 +241,7 @@ TPIO2::newTransaction()
 		MUTEXPROF_START("waitrebase");
 		STAGEPROF_STAGE(0xFF0000);
 
-		boost::unique_lock<boost::mutex> g(m_mtxRebase);
+		std::unique_lock<std::mutex> g(m_mtxRebase);
 
 		PTNK_MEMBARRIER_COMPILER;
 		if(m_bDuringRebase)
@@ -254,7 +254,7 @@ TPIO2::newTransaction()
 
 	shared_ptr<ActiveOvr> aovr;
 	{
-		boost::shared_lock<boost::shared_mutex> g(m_mtxAOvr);
+		std::lock_guard<std::mutex> g(m_mtxAOvr);
 		aovr = m_aovr;
 	}
 	unique_ptr<LocalOvr> lovr = aovr->newTx();
@@ -487,7 +487,7 @@ TPIO2::restoreState()
 	// 3. for each pages found in the scan, sorted by its version,
 	//    add ovr entries and handle streak data per tx
 	{
-		boost::unique_lock<boost::shared_mutex> g(m_mtxAOvr);
+		std::lock_guard<std::mutex> g(m_mtxAOvr);
 		m_aovr = shared_ptr<ActiveOvr>(new ActiveOvr(pgidStartPage, verBase));
 	}
 	unique_ptr<TPIO2TxSession> tx = newTransaction();

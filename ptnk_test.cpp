@@ -15,6 +15,7 @@
 #include "ptnk/sysutils.h"
 
 #include <iostream>
+#include <functional>
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -29,6 +30,25 @@
 
 #include <gtest/gtest.h>
 using namespace ptnk;
+
+// something like a boost::thread_group
+class thread_group
+{
+public:
+	void create_thread(const std::function<void ()>& f)
+	{
+		m_impl.push_back(Pthread(new std::thread(f)));	
+	}
+
+	void join_all()
+	{
+		for(auto& t: m_impl) t->join();	
+	}
+
+private:
+	typedef unique_ptr<std::thread> Pthread;
+	std::vector<Pthread> m_impl;
+};
 
 class PageIOProxy : public PageIO
 {
@@ -4001,7 +4021,7 @@ TEST(ptnk, PageIOMem_multithread)
 	const size_t c = NUM_THREAD * PG_PER_THREAD;
 
 	std::vector<page_id_t> check(c);
-	boost::thread_group tg;
+	thread_group tg;
 	for(int i = 0; i < NUM_THREAD; ++ i)
 	{
 		tg.create_thread(alloc_pg(pio.get(), &check[i * PG_PER_THREAD], PG_PER_THREAD));
@@ -4034,7 +4054,7 @@ TEST(ptnk, PartitionedPageIO_multithread)
 	const size_t c = NUM_THREAD * PG_PER_THREAD;
 
 	std::vector<page_id_t> check(c);
-	boost::thread_group tg;
+	thread_group tg;
 	for(int i = 0; i < NUM_THREAD; ++ i)
 	{
 		tg.create_thread(alloc_pg(pio.get(), &check[i * PG_PER_THREAD], PG_PER_THREAD));
@@ -4124,7 +4144,7 @@ TEST(ptnk, multithread_put)
 	const int NUM_KEYS_PER_TH = NUM_KEYS / NUM_THREADS;
 	SETUP_ORD(NUM_KEYS);
 
-	boost::thread_group tg;
+	thread_group tg;
 	for(int i = 0; i < NUM_THREADS; ++ i)
 	{
 		tg.create_thread(put_ary_db(db, &ord[NUM_KEYS_PER_TH * i], NUM_KEYS_PER_TH));

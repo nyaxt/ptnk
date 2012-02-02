@@ -20,7 +20,7 @@ Helper::~Helper()
 void
 Helper::enq(Job job)
 {
-	std::unique_lock<std::mutex> g(m_mtxJobs);
+	std::lock_guard<std::mutex> g(m_mtxJobs);
 
 	m_jobq.push(job);
 	m_condJobArrival.notify_all();

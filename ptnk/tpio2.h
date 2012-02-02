@@ -5,7 +5,7 @@
 #include "stm.h"
 #include "pol.h"
 
-#include <boost/thread.hpp>
+#include <thread>
 
 // Transactional PageIO impl. using stm.h
 
@@ -180,7 +180,7 @@ private:
 	shared_ptr<PageIO> m_backend;
 	bool m_sync;
 
-	boost::shared_mutex m_mtxAOvr;
+	std::mutex m_mtxAOvr;
 	shared_ptr<ActiveOvr> m_aovr;
 
 	TPIOStat m_stat;
@@ -191,8 +191,8 @@ private:
 	//! true if refresh is being done
 	bool m_bDuringRefresh;
 
-	boost::mutex m_mtxRebase;
-	boost::condition_variable m_condRebase;
+	std::mutex m_mtxRebase;
+	std::condition_variable m_condRebase;
 };
 inline
 std::ostream& operator<<(std::ostream& s, const TPIO2& o)

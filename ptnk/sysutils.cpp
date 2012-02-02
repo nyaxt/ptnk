@@ -134,7 +134,7 @@ stageprof_genthrid()
 	static std::mutex s_mtx;
 	static int s_thrid_next = 1;
 
-	std::unique_lock<std::mutex> g(s_mtx);
+	std::lock_guard<std::mutex> g(s_mtx);
 
 	return s_thrid_next++;
 }

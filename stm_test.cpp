@@ -1,10 +1,12 @@
 #include "ptnk/stm.h"
 
 #include <iostream>
+#include <thread>
 #include <gtest/gtest.h>
-#include <boost/thread.hpp>
 
 using namespace ptnk;
+
+typedef unique_ptr<std::thread> Pthread;
 
 TEST(ptnk, stm_localovr)
 {
@@ -128,13 +130,13 @@ TEST(ptnk, stm_multithread)
 {
 	ActiveOvr ao;
 
-	boost::thread_group tg;
+	std::vector<Pthread> tg;
 
 	const int NUM_THREADS = 8;
 	const int NUM_TX = 100000;
 	for(int ith = 0; ith < NUM_THREADS; ++ ith)
 	{
-		tg.create_thread([&ao,ith]() {
+		tg.push_back(Pthread(new std::thread([&ao,ith]() {
 			for(int i = 0; i < NUM_TX; ++ i)
 			{
 				std::unique_ptr<LocalOvr> t(ao.newTx());
@@ -143,9 +145,9 @@ TEST(ptnk, stm_multithread)
 				ao.tryCommit(t);
 				EXPECT_FALSE(t.get());
 			}
-		});
+		})));
 	}
-	tg.join_all();
+	for(auto& t: tg) t->join();
 
 	std::cout << ao;
 
@@ -167,11 +169,11 @@ TEST(ptnk, stm_multithread_w_conflict)
 {
 	ActiveOvr ao;
 
-	boost::thread_group tg;
+	std::vector<Pthread> tg;
 
 	const int NUM_TX = 1000000;
 	volatile int committed_tx = -2;
-	tg.create_thread([&]() {
+	tg.push_back(Pthread(new std::thread([&]() {
 		for(int i = 0; i < NUM_TX; ++ i)
 		{
 			// good tx	
@@ -185,9 +187,9 @@ TEST(ptnk, stm_multithread_w_conflict)
 			PTNK_MEMBARRIER_HW; // force write committed_tx
 		}
 		committed_tx = -1; // break loop in the other thread
-	});
+	})));
 
-	tg.create_thread([&]() {
+	tg.push_back(Pthread(new std::thread([&]() {
 		// wait until tx progress
 		while(committed_tx == -2)
 		{
@@ -226,9 +228,9 @@ TEST(ptnk, stm_multithread_w_conflict)
 				EXPECT_FALSE(t.get()) << "bad tx fail: " << tgt;
 			}
 		}
-	});
+	})));
 
-	tg.join_all();
+	for(auto& t: tg) t->join();
 
 	std::cout << ao;
 }

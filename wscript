@@ -5,7 +5,6 @@ top = '.'
 out = 'build'
 
 import sys
-import commands
 import Utils
 from waflib import Build, Options, TaskGen, Task
 
@@ -92,9 +91,6 @@ def configure(conf):
 	# boost headers
 	conf.check_boost(uselib_store='BOOST')
 
-	# boost thread
-	conf.check_boost(uselib_store='BOOST_THREAD', lib='thread', mt=True)
-
 	conf.write_config_header('ptnk_config.h', remove=True)
 	conf.env.append_unique('DEFINES', ['HAVE_PTNK_CONFIG_H'])
 
@@ -102,7 +98,7 @@ def configure(conf):
 	conf.env.append_unique('CXXFLAGS', ['-fPIC'])
 
 	# c++0x
-	conf.env.append_unique('CXXFLAGS', ['-std=c++0x'])
+	conf.env.append_unique('CXXFLAGS', ['-std=gnu++0x'])
 
 	#########################################################
 	# variants conf. 
@@ -151,7 +147,7 @@ def build(bld):
 	bld.env = bld.all_envs[bld.variant]
 	bld.env.append_unique('INCLUDES', ['..', '.'])
 
-        bld.install_files('${PREFIX}/include', ['ptnk.h', 'ptnk/buffer.h', 'ptnk/common.h', 'ptnk/db.h', 'ptnk/exceptions.h', 'ptnk/page.h', 'ptnk/query.h', 'ptnk/toc.h', 'ptnk/types.h'], relative_trick=True)
+	bld.install_files('${PREFIX}/include', ['ptnk.h', 'ptnk/buffer.h', 'ptnk/common.h', 'ptnk/db.h', 'ptnk/exceptions.h', 'ptnk/page.h', 'ptnk/query.h', 'ptnk/toc.h', 'ptnk/types.h'], relative_trick=True)
 
 	b_ptnk = bld.stlib(
 		target = 'ptnk',

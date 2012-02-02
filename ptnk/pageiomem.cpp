@@ -99,7 +99,7 @@ PageIOMem::~PageIOMem()
 void
 PageIOMem::expandTo(page_id_t pgid)
 {
-	std::unique_lock<std::mutex> g(m_mtxAlloc);
+	std::lock_guard<std::mutex> g(m_mtxAlloc);
 
 	ssize_t numNeeded = static_cast<ssize_t>(pgid) - m_mf->numPagesReserved() + 1;
 	if(numNeeded <= 0) return;

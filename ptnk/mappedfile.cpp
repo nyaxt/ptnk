@@ -13,7 +13,7 @@
 #include <sys/stat.h>
 #include <sys/types.h>
 
-// #define VERBOSE_UNMAP
+#define VERBOSE_UNMAP
 
 namespace ptnk
 {
@@ -116,6 +116,7 @@ MappedFile::MappedFile(part_id_t partid, const std::string& filename, int fd, in
 		m_bInMem = true;
 	}
 
+	m_mapFirst.pgidStart = 0;
 	m_mapFirst.pgidEnd = 0;
 	m_mapFirst.offset = NULL;
 

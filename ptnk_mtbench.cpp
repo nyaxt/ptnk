@@ -2,7 +2,7 @@
 #include "ptnk/sysutils.h"
 #include "ptnk.h"
 
-#include <boost/thread.hpp>
+#include <thread>
 
 using namespace ptnk;
 
@@ -75,12 +75,13 @@ run_bench()
 		// b.cp("db init");
 		b.start();
 
-		boost::thread_group tg;
+		typedef unique_ptr<std::thread> Pthread;
+		std::vector<Pthread> tg;
 		for(int i = 0; i < NUM_THREADS; ++ i)
 		{
-			tg.create_thread(put_ary_db(db, &keys[NUM_KEYS_PER_TH * i], NUM_KEYS_PER_TH));
+			tg.push_back(Pthread(new std::thread(put_ary_db(db, &keys[NUM_KEYS_PER_TH * i], NUM_KEYS_PER_TH))));
 		}
-		tg.join_all();
+		for(auto& t: tg) t->join();
 
 		b.cp("tx done");
 	}
