@@ -3143,6 +3143,74 @@ TEST(ptnk, TPIO_refreshOldPages_btree_single)
 	}
 }
 
+TEST(ptnk, TPIO_refreshOldPages_btree_1000)
+{
+	shared_ptr<PageIO> pio(new PageIOMem);
+	TPIO2 tpio(pio);
+
+	{
+		unique_ptr<TPIO2TxSession> tx(tpio.newTransaction());	
+		tx->setPgidStartPage(btree_init(tx.get()));
+		tx->setPgidStartPage(btree_put(tx->pgidStartPage(), cstr2ref("key"), cstr2ref("value"), PUT_INSERT, tx.get()));
+
+		ASSERT_TRUE(tx->tryCommit());
+	}
+
+	for(int j = 0; j < 10; ++ j)
+	{
+		unique_ptr<TPIO2TxSession> tx(tpio.newTransaction());	
+
+		for(int i = 0; i < 100; ++ i)
+		{
+			int kn = j * 100 + i;
+			char k[8]; sprintf(k, "%u", kn);
+
+			tx->setPgidStartPage(btree_put(tx->pgidStartPage(), cstr2ref(k), cstr2ref(k), PUT_INSERT, tx.get()));	
+		}
+
+		ASSERT_TRUE(tx->tryCommit());
+	}
+
+	std::cout << "pgidLast: " << pgid2str(pio->getLastPgId()) << std::endl;
+
+	// create 200 dummy pages
+	for(int i = 0; i < 20; ++ i)
+	{
+		unique_ptr<TPIO2TxSession> txUmeUme(tpio.newTransaction());
+		
+		for(int j = 0; j < 10; ++ j)
+		{
+			DebugPage pg(txUmeUme->newInitPage<DebugPage>());
+			pio->sync(pg);
+		}
+
+		ASSERT_TRUE(txUmeUme->tryCommit());
+	}
+
+	tpio.refreshOldPages(200);
+	pio->discardOldPages(200);
+
+	{
+		unique_ptr<TPIO2TxSession> tx1(tpio.newTransaction());
+		EXPECT_LT(30, tx1->pgidStartPage());
+
+		CheckOldPgAccess c(tx1.get(), 30);
+
+		Buffer val;
+
+		btree_getstrval(tx1->pgidStartPage(), "key", val, &c);
+		EXPECT_STREQ("value", val.get());
+
+		for(int kn = 0; kn < 1000; ++ kn)
+		{
+			char k[8]; sprintf(k, "%u", kn);
+
+			btree_getstrval(tx1->pgidStartPage(), k, val, &c);
+			EXPECT_STREQ(k, val.get());
+		}
+	}
+}
+
 TEST(ptnk, nUniquePages)
 {
 	DB db;
