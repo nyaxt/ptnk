@@ -63,7 +63,7 @@ run_bench()
 {
 	stageprof_init();
 
-	Bench b((boost::format("%1% %2%") % PROGNAME % comment).str());
+	Bench b(PROGNAME, comment);
 	{
 		const int NUM_KEYS_PER_TH = NUM_KEYS / NUM_THREADS;
 

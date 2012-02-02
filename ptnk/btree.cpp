@@ -3,7 +3,6 @@
 #include "pageio.h"
 
 #include <stdio.h>
-#include <boost/tuple/tuple.hpp>
 
 namespace ptnk
 {

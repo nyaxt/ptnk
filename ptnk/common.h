@@ -69,7 +69,6 @@ int ptnk_memcmp(const void* a, const void* b, size_t s);
 #include <algorithm>
 #include <vector>
 #include <memory>
-#include <boost/scoped_ptr.hpp>
 #include <tuple>
 
 namespace ptnk

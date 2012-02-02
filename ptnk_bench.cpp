@@ -8,7 +8,7 @@ run_bench()
 {
 	// sleep(3);
 
-	Bench b("ptnk_bench");
+	Bench b("ptnk_bench", comment);
 	{
 		ptnk_opts_t opts = OWRITER | OCREATE | OTRUNCATE | OPARTITIONED;
 		if(do_sync) opts |= OAUTOSYNC;

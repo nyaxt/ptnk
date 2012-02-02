@@ -5,10 +5,9 @@
 #include "ptnk/sysutils.h"
 using ptnk::HighResTimeStamp;
 
+#include <sstream>
 #include <iostream>
 #include <iomanip>
-#include <boost/format.hpp>
-#include <boost/foreach.hpp>
 
 class Bench 
 {
@@ -17,6 +16,14 @@ public:
 	:	m_benchname(benchname)
 	{
 		start();
+	}
+
+	Bench(const std::string& progname, const std::string& comment)
+	{
+		std::stringstream ss;
+		ss << progname << " " << comment;
+
+		m_benchname = ss.str();
 	}
 
 	void start()
@@ -41,7 +48,7 @@ public:
 	void dump()
 	{
 		std::cout << "RESULT\t" << m_benchname << '\t' << std::setiosflags(std::ios::fixed) << std::setprecision(4) << (double)m_ts_end.elapsed_ns(m_ts_start) / NSEC_PER_SEC;
-		BOOST_FOREACH(struct checkpoint& cp, m_cps)
+		for(struct checkpoint& cp: m_cps)
 		{
 			std::cout << '\t' << std::setiosflags(std::ios::fixed) << std::setprecision(4) << (double)cp.ts.elapsed_ns(m_ts_start) / NSEC_PER_SEC;
 		}

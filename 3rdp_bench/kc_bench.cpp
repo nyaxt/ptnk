@@ -9,7 +9,7 @@ run_bench()
 	uint32_t dbopt = TreeDB::OWRITER | TreeDB::OCREATE | TreeDB::OTRUNCATE;
 	if(do_sync) dbopt |= TreeDB::OAUTOSYNC;
 
-	Bench b((boost::format("kc_bench %1%") % comment).str());
+	Bench b("kc_bench", comment);
 	{
 		TreeDB db;
 		db.open(dbfile, dbopt);

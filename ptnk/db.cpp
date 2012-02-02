@@ -2,8 +2,6 @@
 
 #include <stdio.h>
 
-#include <boost/tuple/tuple.hpp>
-
 #include "pageiomem.h"
 #include "partitionedpageio.h"
 #include "btree.h"

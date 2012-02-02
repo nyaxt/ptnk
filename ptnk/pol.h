@@ -4,8 +4,6 @@
 #include "types.h"
 #include "buffer.h"
 
-#include <boost/foreach.hpp>
-
 namespace ptnk
 {
 
@@ -43,7 +41,7 @@ public:
 		size_t count = m_impl.size();
 		tgt.write(BufferCRef(&count, sizeof(size_t)));
 
-		BOOST_FOREACH(page_id_t pgid, m_impl)
+		for(page_id_t pgid: m_impl)
 		{
 			BufferCRef buf(&pgid, sizeof(page_id_t));
 			tgt.write(buf);

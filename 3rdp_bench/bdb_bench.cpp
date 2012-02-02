@@ -13,7 +13,7 @@ run_bench()
 	
 	uint32_t dbopt = DB_INIT_LOG | DB_INIT_MPOOL | DB_INIT_TXN | DB_CREATE | DB_LOG_DSYNC;
 
-	Bench b((boost::format("%1% %2%") % PROGNAME % comment).str());
+	Bench b(PROGNAME, comment);
 	{
 		DbEnv* envp = NULL;
 		Db* dbp = NULL;  

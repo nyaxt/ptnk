@@ -1,6 +1,6 @@
 CXX=g++
 CXXFLAGS := $(CXXFLAGS) -O2
-LDFLAGS := $(LDFLAGS) -lptnk -lboost_thread
+LDFLAGS := $(LDFLAGS) -lptnk
 
 run_demo: cxx_demo
 	./cxx_demo hoge

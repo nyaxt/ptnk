@@ -42,9 +42,6 @@ def configure(conf):
 	conf.check_cxx(uselib_store='MYSQL', header_name='sql_priv.h', mandatory=True)
 	conf.check_cxx(uselib_store='MYSQL_SERV', lib='mysqlservices', mandatory=True)
 
-	# boost
-	conf.check_boost(uselib_store='BOOST_THREAD', lib='thread', mt=True)
-
 	# ptnk
 	conf.check_cxx(uselib_store='PTNK', lib='ptnk')
 

@@ -46,11 +46,11 @@ see examples directory
 ### Dependencies
 * required packages on debian wheezy
 
-	sudo apt-get install libboost-thread1.46-dev libgtest-dev libgoogle-perftools-dev
+	sudo apt-get install libgtest-dev libgoogle-perftools-dev
 
 * required packages on Fedora 15
 
-	sudo yum install boost-devel gtest-devel gcc-c++
+	sudo yum install gtest-devel gcc-c++
 
 ### Build & Install
 

@@ -236,7 +236,7 @@ run_bench(void)
 		return;
 	}
 
-	Bench b((boost::format("%1% %2%") % PROGNAME % comment).str());
+	Bench b("haildb_bench", comment);
 	{
 		err = ib_init();
 		assert(err == DB_SUCCESS);

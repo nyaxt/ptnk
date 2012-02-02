@@ -5,9 +5,6 @@
 #include "query.h"
 #include "toc.h"
 
-#include <boost/shared_ptr.hpp>
-#include <boost/scoped_ptr.hpp>
-
 namespace ptnk
 {
 

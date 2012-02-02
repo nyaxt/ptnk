@@ -13,7 +13,7 @@ run_bench()
 		exit(1);
 	}
 
-	Bench b((boost::format("%1% %2%") % PROGNAME % comment).str());
+	Bench b("luxio_bench", comment);
 	{
 		std::auto_ptr<Lux::IO::Btree> bt(new Lux::IO::Btree(Lux::IO::CLUSTER));
 		bt->open(dbfile, Lux::IO::DB_CREAT);

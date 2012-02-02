@@ -9,7 +9,7 @@ import Utils
 from waflib import Build, Options, TaskGen, Task
 
 def options(opt):
-	opt.load('compiler_cxx boost gtest')
+	opt.load('compiler_cxx gtest')
 
 	opt.add_option('--with-mtxprof', action='store_true', default=False, help='enable mutex profiling', dest='mtxprof')
 	opt.add_option('--with-stageprof', action='store_true', default=False, help='enable stage profiling', dest='stageprof')
@@ -20,7 +20,7 @@ def configure(conf):
 	conf.env.append_unique('INCLUDES', ['/home/kouhei/local/include', '/usr/local/include', '/opt/local/include'])
 	conf.env.append_unique('LIBPATH', ['/home/kouhei/local/lib', '/usr/local/lib', '/opt/local/lib'])
 
-	conf.load('compiler_cxx boost gtest')
+	conf.load('compiler_cxx gtest')
 
 	# DTrace / SystemTap probes
 	if Options.options.dtrace:
@@ -88,9 +88,6 @@ def configure(conf):
 	conf.check_cxx(uselib_store='PTHREAD', lib='pthread', mandatory=True)
 	conf.check_cxx(uselib_store='PTHREAD', lib='rt', mandatory=False) # only on linux ?
 
-	# boost headers
-	conf.check_boost(uselib_store='BOOST')
-
 	conf.write_config_header('ptnk_config.h', remove=True)
 	conf.env.append_unique('DEFINES', ['HAVE_PTNK_CONFIG_H'])
 
@@ -153,7 +150,7 @@ def build(bld):
 		target = 'ptnk',
 		install_path = '${PREFIX}/lib',
 
-		use = 'TCMALLOC PTHREAD BOOST_THREAD',
+		use = 'TCMALLOC PTHREAD',
 		source = '''
 		ptnk/hash.cpp
 		ptnk/exceptions.cpp
@@ -196,7 +193,7 @@ def build(bld):
 			target = 'helper_test',
 
 			features = 'gtest',
-			use = 'TCMALLOC PTHREAD BOOST_THREAD GTEST ptnk',
+			use = 'TCMALLOC PTHREAD GTEST ptnk',
 			source = 'helper_test.cpp'
 			)
 
@@ -204,7 +201,7 @@ def build(bld):
 			target = 'stm_test',
 
 			features = 'gtest',
-			use = 'TCMALLOC PTHREAD BOOST_THREAD GTEST ptnk',
+			use = 'TCMALLOC PTHREAD GTEST ptnk',
 			source = 'stm_test.cpp'
 			)
 
@@ -212,13 +209,13 @@ def build(bld):
 			target = 'ptnk_test',
 
 			features = 'gtest',
-			use = 'TCMALLOC PTHREAD BOOST_THREAD GTEST ptnk',
+			use = 'TCMALLOC PTHREAD GTEST ptnk',
 			source = 'ptnk_test.cpp'
 			)
 
 		bld.program(
 			target = 'stageprof_test',
-			use = 'TCMALLOC PTHREAD BOOST_THREAD GTEST ptnk',
+			use = 'TCMALLOC PTHREAD GTEST ptnk',
 			source = 'stageprof_test.cpp'
 			)
 
@@ -234,7 +231,7 @@ def build(bld):
 	bld.program(
 		target = 'ptnk_mtbench',
 		
-		use = 'TCMALLOC PTHREAD BOOST ptnk',
+		use = 'TCMALLOC PTHREAD ptnk',
 		source = 'ptnk_mtbench.cpp'
 		)
 
@@ -243,42 +240,42 @@ def build(bld):
 		target = 'ptnk_dump',
 
 		cxxflags = '-std=c++0x',
-		use = 'TCMALLOC BOOST ptnk',
+		use = 'TCMALLOC ptnk',
 		source = 'ptnk_dump.cpp'
 		)
 
 	bld.program(
 		target = 'ptnk_bindump',
 
-		use = 'TCMALLOC BOOST ptnk',
+		use = 'TCMALLOC ptnk',
 		source = 'ptnk_bindump.cpp'
 		)
 
 	bld.program(
 		target = 'ptnk_dumpstreak',
 
-		use = 'TCMALLOC BOOST ptnk',
+		use = 'TCMALLOC ptnk',
 		source = 'ptnk_dumpstreak.cpp'
 		)
 
 	bld.program(
 		target = 'ptnk_findroot',
 
-		use = 'TCMALLOC BOOST ptnk',
+		use = 'TCMALLOC ptnk',
 		source = 'ptnk_findroot.cpp'
 		)
 
 	bld.program(
 		target = 'ptnk_mtpio',
 
-		use = 'TCMALLOC BOOST ptnk',
+		use = 'TCMALLOC ptnk',
 		source = 'ptnk_mtpio.cpp'
 		)
 
 	bld.program(
 		target = 'ptnk_compact',
 
-		use = 'TCMALLOC BOOST ptnk',
+		use = 'TCMALLOC ptnk',
 		source = 'ptnk_compact.cpp'
 		)
 
