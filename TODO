@@ -1,6 +1,5 @@
 - need refactoring:
   - Page::updateLinks_ depend on mod_info_t, which is deprecated
-  - Page::refreshAllLeafPages_ has pgidDep arg, which is not used at all
 
 - workdir may change while run by lib user
   - PartitionedPageIO have to handle that
@@ -9,9 +8,6 @@
   - can be reused across transactions, but can't be shared by two or more concurrent transactions.
 
 - ptnk_bindump seems to be broken
-
-- remove pgidDep
-  -> done partiallly
 
 - Leaf::update may invoke doSplit but may cause no split 
   - update from large val -> small val fragments leaf

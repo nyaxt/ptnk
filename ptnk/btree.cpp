@@ -37,8 +37,8 @@ void node_dump(const Page& pg, PageIO* pio)
 void node_dumpGraph(const Page& pg, FILE* fp, PageIO* pio)
 { Node(pg).dumpGraph_(fp, pio); }
 
-bool node_refreshAllLeafPages(const Page& pg, void** cursor, page_id_t threshold, int numPages, page_id_t pgidDep, PageIO* pio)
-{ return Node(pg).refreshAllLeafPages_(cursor, threshold, numPages, pgidDep, pio); }
+bool node_refreshAllLeafPages(const Page& pg, void** cursor, page_id_t threshold, int numPages, PageIO* pio)
+{ return Node(pg).refreshAllLeafPages_(cursor, threshold, numPages, pio); }
 
 static Page::dyndispatcher_t g_node_handlers = 
 {
@@ -732,7 +732,7 @@ Node::dumpGraph_(FILE* fp, PageIO* pio) const
 }
 
 bool
-Node::refreshAllLeafPages_(void** cursor, page_id_t threshold, int numPages, page_id_t pgidDep, PageIO* pio) const
+Node::refreshAllLeafPages_(void** cursor, page_id_t threshold, int numPages, PageIO* pio) const
 {
 	if(*cursor && numPages == 0)
 	{
@@ -2237,8 +2237,8 @@ void dknode_dump(const Page& pg, PageIO* pio)
 void dknode_dumpGraph(const Page& pg, FILE* fp, PageIO* pio)
 { DupKeyNode(pg).dumpGraph_(fp, pio); }
 
-bool dknode_refreshAllLeafPages(const Page& pg, void** cursor, page_id_t threshold, int numPages, page_id_t pgidDep, PageIO* pio)
-{ return DupKeyNode(pg).refreshAllLeafPages_(cursor, threshold, numPages, pgidDep, pio); }
+bool dknode_refreshAllLeafPages(const Page& pg, void** cursor, page_id_t threshold, int numPages, PageIO* pio)
+{ return DupKeyNode(pg).refreshAllLeafPages_(cursor, threshold, numPages, pio); }
 
 static Page::dyndispatcher_t g_dknode_handlers = 
 {
@@ -2683,7 +2683,7 @@ DupKeyNode::dumpGraph_(FILE* fp, PageIO* pio) const
 }
 
 bool
-DupKeyNode::refreshAllLeafPages_(void** cursor, page_id_t threshold, int numPages, page_id_t pgidDep, PageIO* pio) const
+DupKeyNode::refreshAllLeafPages_(void** cursor, page_id_t threshold, int numPages, PageIO* pio) const
 {
 	PTNK_CHECK(false); // TODO: implement here!
 }
@@ -3193,7 +3193,7 @@ btree_propagate(btree_split_t& split, bool bPrevWasOvr, btree_cursor_t* cur, Pag
 }
 
 page_id_t
-btree_put(page_id_t pgidRoot, BufferCRef key, BufferCRef value, put_mode_t mode, page_id_t pgidDep, PageIO* pio)
+btree_put(page_id_t pgidRoot, BufferCRef key, BufferCRef value, put_mode_t mode, PageIO* pio)
 {
 	PTNK_PROBE(PTNK_BTREE_PUT_START());
 

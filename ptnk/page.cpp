@@ -60,14 +60,14 @@ Page::dumpGraph(FILE* fp, PageIO* pio) const
 }
 
 bool
-Page::refreshAllLeafPages(void** cursor, page_id_t threshold, int numPages, page_id_t pgidDep, PageIO* pio) const
+Page::refreshAllLeafPages(void** cursor, page_id_t threshold, int numPages, PageIO* pio) const
 {
 	dyndispatcher_t* table = ms_dyndispatch[pageType()];
 
 	PTNK_CHECK(table);
 	PTNK_CHECK(table->refreshAllLeafPages);
 
-	return table->refreshAllLeafPages(*this, cursor, threshold, numPages, pgidDep, pio);
+	return table->refreshAllLeafPages(*this, cursor, threshold, numPages, pio);
 }
 
 void
@@ -92,8 +92,8 @@ void bt_dump(const Page& pg, PageIO* pio)
 void bt_dumpGraph(const Page& pg, FILE* fp, PageIO* pio)
 { BinTreePage(pg).dumpGraph_(fp, pio); }
 
-bool bt_refreshAllLeafPages(const Page& pg, void** cursor, page_id_t threshold, int numPages, page_id_t pgidDep, PageIO* pio)
-{ return BinTreePage(pg).refreshAllLeafPages_(cursor, threshold, numPages, pgidDep, pio); }
+bool bt_refreshAllLeafPages(const Page& pg, void** cursor, page_id_t threshold, int numPages, PageIO* pio)
+{ return BinTreePage(pg).refreshAllLeafPages_(cursor, threshold, numPages, pio); }
 
 static Page::dyndispatcher_t g_bt_handlers = 
 {
@@ -188,7 +188,7 @@ BinTreePage::dumpGraph_(FILE* fp, PageIO* pio) const
 }
 
 bool
-BinTreePage::refreshAllLeafPages_(void** cursor, page_id_t threshold, int numPages, page_id_t pgidDep, PageIO* pio) const
+BinTreePage::refreshAllLeafPages_(void** cursor, page_id_t threshold, int numPages, PageIO* pio) const
 {
 	std::cerr << "refreshAllLeafPages called for page " << pageId() << std::endl;
 
@@ -220,7 +220,7 @@ BinTreePage::refreshAllLeafPages_(void** cursor, page_id_t threshold, int numPag
 
 		for(page_id_t pgidChild: body->child)
 		{
-			if(pio->readPage(pgidChild).refreshAllLeafPages(NULL, threshold, numPages, pgidDep, pio))
+			if(pio->readPage(pgidChild).refreshAllLeafPages(NULL, threshold, numPages, pio))
 			{
 				bProp = true;	
 			}

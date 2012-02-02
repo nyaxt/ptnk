@@ -16,8 +16,8 @@ void ovv_dump(const Page& pg, PageIO* pio)
 void ovv_dumpGraph(const Page& pg, FILE* fp, PageIO* pio)
 { OverviewPage(pg).dumpGraph_(fp, pio); }
 
-bool ovv_refreshAllLeafPages(const Page& pg, void** cursor, page_id_t threshold, int numPages, page_id_t pgidDep, PageIO* pio)
-{ return OverviewPage(pg).refreshAllLeafPages_(cursor, threshold, numPages, pgidDep, pio); }
+bool ovv_refreshAllLeafPages(const Page& pg, void** cursor, page_id_t threshold, int numPages, PageIO* pio)
+{ return OverviewPage(pg).refreshAllLeafPages_(cursor, threshold, numPages, pio); }
 	
 static Page::dyndispatcher_t g_ovv_handlers = 
 {
@@ -348,10 +348,8 @@ OverviewPage::dumpGraph_(FILE* fp, PageIO* pio) const
 }
 
 bool
-OverviewPage::refreshAllLeafPages_(void** cursor, page_id_t threshold, int numPages, page_id_t pgidDep, PageIO* pio) const
+OverviewPage::refreshAllLeafPages_(void** cursor, page_id_t threshold, int numPages, PageIO* pio) const
 {
-	PTNK_ASSERT(pgidDep == PGID_INVALID);
-
 	if(*cursor && numPages == 0)
 	{
 		// free cursor
@@ -373,7 +371,7 @@ OverviewPage::refreshAllLeafPages_(void** cursor, page_id_t threshold, int numPa
 		ralpc->cursorTable = NULL;
 	}
 
-	if(pio->readPage(getDefaultTableRoot()).refreshAllLeafPages(&ralpc->cursorTable, threshold, numPages, pageOrigId(), pio))
+	if(pio->readPage(getDefaultTableRoot()).refreshAllLeafPages(&ralpc->cursorTable, threshold, numPages, pio))
 	{
 		pio->notifyPageWOldLink(pageOrigId());	
 	}

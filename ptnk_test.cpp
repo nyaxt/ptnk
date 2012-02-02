@@ -2141,13 +2141,13 @@ TEST(ptnk, btree_basic)
 	
 	page_id_t idRoot = btree_init(pio.get());
 
-	idRoot = btree_put(idRoot, cstr2ref("hoge"), cstr2ref("fuga"), PUT_INSERT, PGID_INVALID, pio.get());
+	idRoot = btree_put(idRoot, cstr2ref("hoge"), cstr2ref("fuga"), PUT_INSERT, pio.get());
 
 	Buffer value;
 	btree_getstrval(idRoot, "hoge", value, pio.get());
 	EXPECT_STREQ("fuga", value.get());
 
-	idRoot = btree_put(idRoot, cstr2ref("hoge"), cstr2ref("asdffdsa"), PUT_UPDATE, PGID_INVALID, pio.get());
+	idRoot = btree_put(idRoot, cstr2ref("hoge"), cstr2ref("asdffdsa"), PUT_UPDATE, pio.get());
 
 	btree_getstrval(idRoot, "hoge", value, pio.get());
 	EXPECT_STREQ("asdffdsa", value.get());
@@ -2164,7 +2164,7 @@ TEST(ptnk, btree_cursor_get_first)
 	
 	page_id_t idRoot = btree_init(pio.get());
 
-	idRoot = btree_put(idRoot, cstr2ref("hoge"), cstr2ref("fuga"), PUT_INSERT, PGID_INVALID, pio.get());
+	idRoot = btree_put(idRoot, cstr2ref("hoge"), cstr2ref("fuga"), PUT_INSERT, pio.get());
 
 	btree_cursor_wrap cur;
 	btree_cursor_front(cur.get(), idRoot, pio.get());
@@ -2192,7 +2192,7 @@ TEST(ptnk, btree_cursor_nextprev)
 	{
 		uint32_t kb = PTNK_BSWAP32(i); BufferCRef key(&kb, 4);
 		char buf[8]; sprintf(buf, "%u", i);
-		idRoot = btree_put(idRoot, key, cstr2ref(buf), PUT_INSERT, PGID_INVALID, pio.get());
+		idRoot = btree_put(idRoot, key, cstr2ref(buf), PUT_INSERT, pio.get());
 	}
 
 	btree_cursor_wrap cur;
@@ -2247,7 +2247,7 @@ TEST(ptnk, dupkey_tree_10k)
 	for(int i = 0; i < DUPKEY_COUNT; ++ i)
 	{
 		char value[32]; sprintf(value, "dupvalue%d", i);
-		idRoot = btree_put(idRoot, dupkey, cstr2ref(value), PUT_INSERT, PGID_INVALID, pio.get());
+		idRoot = btree_put(idRoot, dupkey, cstr2ref(value), PUT_INSERT, pio.get());
 	}
 
 	Buffer k, v;
@@ -2297,7 +2297,7 @@ TEST(ptnk, dupkey_tree_massive)
 	}
 	for(int i = 0; i < DUPKEY_COUNT; ++ i)
 	{
-		idRoot = btree_put(idRoot, dupkey, BufferCRef(value, sizeof(value)), PUT_INSERT, PGID_INVALID, pio.get());
+		idRoot = btree_put(idRoot, dupkey, BufferCRef(value, sizeof(value)), PUT_INSERT, pio.get());
 	}
 
 	Buffer k, v;
@@ -2343,10 +2343,10 @@ TEST(ptnk, btree_many_dupkeys)
 	for(int i = 0; i < DUPKEY_COUNT; ++ i)
 	{
 		char value[32]; sprintf(value, "dupvalue%d", i);
-		idRoot = btree_put(idRoot, dupkey, cstr2ref(value), PUT_INSERT, PGID_INVALID, pio.get());
+		idRoot = btree_put(idRoot, dupkey, cstr2ref(value), PUT_INSERT, pio.get());
 	}
-	idRoot = btree_put(idRoot, cstr2ref("cccccc"), cstr2ref("cval"), PUT_INSERT, PGID_INVALID, pio.get());
-	idRoot = btree_put(idRoot, cstr2ref("eeeeee"), cstr2ref("eval"), PUT_INSERT, PGID_INVALID, pio.get());
+	idRoot = btree_put(idRoot, cstr2ref("cccccc"), cstr2ref("cval"), PUT_INSERT, pio.get());
+	idRoot = btree_put(idRoot, cstr2ref("eeeeee"), cstr2ref("eval"), PUT_INSERT, pio.get());
 
 	// pio->readPage(idRoot).dump(pio.get());
 
@@ -2427,12 +2427,12 @@ TEST(ptnk, dktree_nonexact_put_after)
 	for(int i = 0; i < DUPKEY_COUNT; ++ i)
 	{
 		char value[32]; sprintf(value, "dupvalue%d", i);
-		idRoot = btree_put(idRoot, dupkey, cstr2ref(value), PUT_INSERT, PGID_INVALID, pio.get());
+		idRoot = btree_put(idRoot, dupkey, cstr2ref(value), PUT_INSERT, pio.get());
 	}
-	idRoot = btree_put(idRoot, cstr2ref("cccccc"), cstr2ref("cval"), PUT_INSERT, PGID_INVALID, pio.get());
-	idRoot = btree_put(idRoot, cstr2ref("eeeeee"), cstr2ref("eval"), PUT_INSERT, PGID_INVALID, pio.get());
+	idRoot = btree_put(idRoot, cstr2ref("cccccc"), cstr2ref("cval"), PUT_INSERT, pio.get());
+	idRoot = btree_put(idRoot, cstr2ref("eeeeee"), cstr2ref("eval"), PUT_INSERT, pio.get());
 
-	idRoot = btree_put(idRoot, cstr2ref("eaaaaa"), cstr2ref("waaaah"), PUT_INSERT, PGID_INVALID, pio.get());
+	idRoot = btree_put(idRoot, cstr2ref("eaaaaa"), cstr2ref("waaaah"), PUT_INSERT, pio.get());
 
 	// pio->readPage(idRoot).dump(pio.get());
 	
@@ -2457,7 +2457,7 @@ TEST(ptnk, btree_cursor_put)
 		char key[8]; sprintf(key, "%d", i);
 		char val[16]; sprintf(val, "initial_%d", i);
 
-		idRoot = btree_put(idRoot, cstr2ref(key), cstr2ref(val), PUT_INSERT, PGID_INVALID, pio.get());
+		idRoot = btree_put(idRoot, cstr2ref(key), cstr2ref(val), PUT_INSERT, pio.get());
 	}
 
 	for(int i = 0; i < COUNT; ++ i)
@@ -2520,7 +2520,7 @@ TEST(ptnk, btree_nonexact_query)
 		char key[8]; sprintf(key, "%08d", i*10);
 		char val[128]; sprintf(val, "%08d=======================================================================================================================", i);
 
-		idRoot = btree_put(idRoot, cstr2ref(key), cstr2ref(val), PUT_INSERT, PGID_INVALID, pio.get());
+		idRoot = btree_put(idRoot, cstr2ref(key), cstr2ref(val), PUT_INSERT, pio.get());
 	}
 
 	Buffer k, v;
@@ -2598,7 +2598,7 @@ TEST(ptnk, btree_cursor_del)
 		char key[8]; sprintf(key, "%d", i);
 		char val[16]; sprintf(val, "val_%d", i);
 
-		idRoot = btree_put(idRoot, cstr2ref(key), cstr2ref(val), PUT_INSERT, PGID_INVALID, pio.get());
+		idRoot = btree_put(idRoot, cstr2ref(key), cstr2ref(val), PUT_INSERT, pio.get());
 	}
 
 	for(int i = 0; i < COUNT; ++ i)
@@ -2675,7 +2675,7 @@ TEST(ptnk, btree_cursor_del_wholeleaf)
 		char key[8]; sprintf(key, "%d", i);
 		char val[16]; sprintf(val, "val_%d", i);
 
-		idRoot = btree_put(idRoot, cstr2ref(key), cstr2ref(val), PUT_INSERT, PGID_INVALID, pio.get());
+		idRoot = btree_put(idRoot, cstr2ref(key), cstr2ref(val), PUT_INSERT, pio.get());
 	}
 
 	for(int i = 0; i < COUNT; ++ i)
@@ -3109,7 +3109,7 @@ TEST(ptnk, TPIO_refreshOldPages_btree_single)
 	{
 		unique_ptr<TPIO2TxSession> tx(tpio.newTransaction());	
 		tx->setPgidStartPage(btree_init(tx.get()));
-		tx->setPgidStartPage(btree_put(tx->pgidStartPage(), cstr2ref("key"), cstr2ref("value"), PUT_INSERT, PGID_INVALID, tx.get()));
+		tx->setPgidStartPage(btree_put(tx->pgidStartPage(), cstr2ref("key"), cstr2ref("value"), PUT_INSERT, tx.get()));
 
 		ASSERT_TRUE(tx->tryCommit());
 	}

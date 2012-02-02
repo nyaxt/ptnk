@@ -761,7 +761,7 @@ TPIO2::refreshOldPages(page_id_t threshold, size_t pgsPerTx)
 
 		Page pgStart(tx->readPage(tx->pgidStartPage()));
 		
-		pgStart.refreshAllLeafPages(&cursor, threshold, pgsPerTx, PGID_INVALID, tx.get());
+		pgStart.refreshAllLeafPages(&cursor, threshold, pgsPerTx, tx.get());
 
 #ifdef VERBOSE_REFRESH
 		tx->dumpStat();

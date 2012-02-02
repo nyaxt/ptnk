@@ -76,7 +76,7 @@ ssize_t btree_get(page_id_t idRoot, BufferCRef key, BufferRef value, PageIO* pio
  *	@return
  *		page id of the new root (this may/may not be same as _idRoot_)
  */
-page_id_t btree_put(page_id_t idRoot, BufferCRef key, BufferCRef value, put_mode_t mode, page_id_t pgidDep, PageIO* pio);
+page_id_t btree_put(page_id_t idRoot, BufferCRef key, BufferCRef value, put_mode_t mode, PageIO* pio);
 
 //! delete a first kv record with specified key
 /*!

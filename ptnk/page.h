@@ -241,7 +241,7 @@ public:
 		void (*dump)(const Page& pg, PageIO* pio);
 		void (*dumpGraph)(const Page& pg, FILE* fp, PageIO* pio);
 
-		bool (*refreshAllLeafPages)(const Page& pg, void** cursor, page_id_t threshold, int numPages, page_id_t pgidDep, PageIO* pio);
+		bool (*refreshAllLeafPages)(const Page& pg, void** cursor, page_id_t threshold, int numPages, PageIO* pio);
 	};
 	static dyndispatcher_t* ms_dyndispatch[PT_MAX+1];
 
@@ -261,7 +261,7 @@ public:
 
 	void dump(PageIO* pio) const;
 	void dumpGraph(FILE* fp, PageIO* pio) const;
-	bool refreshAllLeafPages(void** cursor, page_id_t threshold, int numPages, page_id_t pgidDep, PageIO* pio) const;
+	bool refreshAllLeafPages(void** cursor, page_id_t threshold, int numPages, PageIO* pio) const;
 
 private:
 	uintptr_t m_impl;
@@ -313,7 +313,7 @@ public:
 	void updateLinks_(mod_info_t* mod, PageIO* pio);
 	void dump_(PageIO* pio = NULL) const;
 	void dumpGraph_(FILE* fp, PageIO* pio = NULL) const;
-	bool refreshAllLeafPages_(void** cursor, page_id_t threshold, int numPages, page_id_t pgidDep, PageIO* pio) const;
+	bool refreshAllLeafPages_(void** cursor, page_id_t threshold, int numPages, PageIO* pio) const;
 
 private:
 	struct Layout;

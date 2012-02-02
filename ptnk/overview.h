@@ -42,7 +42,7 @@ public:
 	void updateLinks_(mod_info_t* mod, PageIO* pio);
 	void dump_(PageIO* pio = NULL) const;
 	void dumpGraph_(FILE* fp, PageIO* pio = NULL) const;
-	bool refreshAllLeafPages_(void** cursor, page_id_t threshold, int numPages, page_id_t pgidDep, PageIO* pio) const;
+	bool refreshAllLeafPages_(void** cursor, page_id_t threshold, int numPages, PageIO* pio) const;
 
 private:	
 	enum

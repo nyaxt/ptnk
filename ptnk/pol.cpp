@@ -23,11 +23,12 @@ PagesOldLink::merge(const PagesOldLink& o)
 	std::copy(o.m_impl.begin(), o.m_impl.end(), std::inserter(m_impl, m_impl.begin()));
 
 #ifdef DUMP_POL_UPD
-	std::cout << "dump upd" << std::endl;
-	BOOST_FOREACH(const entry_t& e, m_impl)
+	std::cout << "dump upd: ";
+	for(page_id_t pgid: m_impl)
 	{
-		std::cout << "e pgid: " << e.pgid << " dep: " << e.pgidDep << std::endl;
+		std::cout << e.pgid << ", ";
 	}
+	std::cout << std::endl;
 #endif // DUMP_POL_UPD
 }
 
