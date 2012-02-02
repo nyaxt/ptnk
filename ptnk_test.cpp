@@ -476,14 +476,26 @@ TEST(ptnk, PageIOMem_discardOldPages2)
 
 	pio->discardOldPages(NPAGES_PREALLOC + 5);
 
-	int i = 0;
-	for(; i < NPAGES_PREALLOC + 5; ++ i)
+	int i;
+	#if 0
+	// below not pass (maybe some freed up space used for other heap allocs?)
+	for(i = 0; i < NPAGES_PREALLOC + 5; ++ i)
 	{
 		Page pg = pio->readPage(i);
 
-		// EXPECT_FALSE(ptr_valid(pg.getRaw())) << "invalid pg " << i;
+		EXPECT_FALSE(ptr_valid(pg.getRaw())) << "invalid pg " << i;
 	}
-	for(; i < NPAGES_PREALLOC + 10; ++ i)
+	#endif
+	for(i = NPAGES_PREALLOC + 5; i < NPAGES_PREALLOC + 10; ++ i)
+	{
+		Page pg = pio->readPage(i);
+
+		EXPECT_TRUE(ptr_valid(pg.getRaw())) << "valid pg " << i;
+	}
+
+	pio->discardOldPages(NPAGES_PREALLOC + 8);
+
+	for(i = NPAGES_PREALLOC + 8; i < NPAGES_PREALLOC + 10; ++ i)
 	{
 		Page pg = pio->readPage(i);
 
@@ -2096,6 +2108,13 @@ TEST(ptnk, node_query)
 	}
 }
 
+void
+btree_getstrval(page_id_t pgidRoot, const char* key, Buffer& val, PageIO* pio)
+{
+	val.setValsize(btree_get(pgidRoot, cstr2ref(key), val.wref(), pio));
+	val.makeNullTerm();
+}
+
 TEST(ptnk, btree_basic)
 {
 	unique_ptr<PageIO> pio(new PageIOMem);
@@ -2105,14 +2124,12 @@ TEST(ptnk, btree_basic)
 	idRoot = btree_put(idRoot, cstr2ref("hoge"), cstr2ref("fuga"), PUT_INSERT, PGID_INVALID, pio.get());
 
 	Buffer value;
-	value.setValsize(btree_get(idRoot, cstr2ref("hoge"), value.wref(), pio.get()));
-	value.makeNullTerm();
+	btree_getstrval(idRoot, "hoge", value, pio.get());
 	EXPECT_STREQ("fuga", value.get());
 
 	idRoot = btree_put(idRoot, cstr2ref("hoge"), cstr2ref("asdffdsa"), PUT_UPDATE, PGID_INVALID, pio.get());
 
-	value.setValsize(btree_get(idRoot, cstr2ref("hoge"), value.wref(), pio.get()));
-	value.makeNullTerm();
+	btree_getstrval(idRoot, "hoge", value, pio.get());
 	EXPECT_STREQ("asdffdsa", value.get());
 
 	idRoot = btree_del(idRoot, cstr2ref("hoge"), pio.get());
@@ -3049,6 +3066,60 @@ TEST(ptnk, TPIO_refreshOldPages_basic)
 		CheckOldPgAccess c(tx1.get(), 5);
 		BinTreePage pg(c.readPage(tx1->pgidStartPage()));
 		dumpGraphBinTree(pg, &c, "graphdump/bintree_after_refresh.gv");
+	}
+
+	pio->discardOldPages(200);
+
+	{
+		unique_ptr<TPIO2TxSession> tx1(tpio.newTransaction());
+
+		EXPECT_LT(5, tx1->pgidStartPage());
+		
+		CheckOldPgAccess c(tx1.get(), 5);
+		BinTreePage pg(c.readPage(tx1->pgidStartPage()));
+		dumpGraphBinTree(pg, &c, "graphdump/bintree_after_refresh.gv");
+	}
+}
+
+TEST(ptnk, TPIO_refreshOldPages_btree_single)
+{
+	shared_ptr<PageIO> pio(new PageIOMem);
+	TPIO2 tpio(pio);
+
+	{
+		unique_ptr<TPIO2TxSession> tx(tpio.newTransaction());	
+		tx->setPgidStartPage(btree_init(tx.get()));
+		tx->setPgidStartPage(btree_put(tx->pgidStartPage(), cstr2ref("key"), cstr2ref("value"), PUT_INSERT, PGID_INVALID, tx.get()));
+
+		ASSERT_TRUE(tx->tryCommit());
+	}
+
+	// create 200 dummy pages
+	for(int i = 0; i < 20; ++ i)
+	{
+		unique_ptr<TPIO2TxSession> txUmeUme(tpio.newTransaction());
+		
+		for(int j = 0; j < 10; ++ j)
+		{
+			DebugPage pg(txUmeUme->newInitPage<DebugPage>());
+			pio->sync(pg);
+		}
+
+		ASSERT_TRUE(txUmeUme->tryCommit());
+	}
+
+	tpio.refreshOldPages(200);
+	pio->discardOldPages(200);
+
+	{
+		unique_ptr<TPIO2TxSession> tx1(tpio.newTransaction());
+		EXPECT_LT(10, tx1->pgidStartPage());
+
+		CheckOldPgAccess c(tx1.get(), 10);
+		Buffer val;
+		btree_getstrval(tx1->pgidStartPage(), "key", val, &c);
+
+		EXPECT_STREQ("value", val.get());
 	}
 }
 

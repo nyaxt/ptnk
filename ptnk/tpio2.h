@@ -75,6 +75,8 @@ public:
 	void notifyPageWOldLink(page_id_t pgid);
 	page_id_t updateLink(page_id_t pgidOld);
 
+	void discardOldPages(page_id_t threshold);
+
 	// ====== start page accessor ======
 
 	page_id_t pgidStartPage()

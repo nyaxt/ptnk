@@ -13,7 +13,7 @@
 #include <sys/stat.h>
 #include <sys/types.h>
 
-#define VERBOSE_UNMAP
+// #define VERBOSE_UNMAP
 
 namespace ptnk
 {

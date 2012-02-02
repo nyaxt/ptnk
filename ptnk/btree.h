@@ -54,8 +54,27 @@ page_id_t btree_init(PageIO* pio);
  */
 ssize_t btree_get(page_id_t idRoot, BufferCRef key, BufferRef value, PageIO* pio); 
 
-//!
+//! associate _value_ to _key_ in the btree
 /*!
+ *	@param [in] idRot
+ *		root node page id, returned from btree_init() / previous call to btree_put()
+ *
+ *	@param [in] key
+ *		key to associate _value_ to
+ *
+ *	@param [in] value
+ *		the value
+ *
+ *	@param [in] mode
+ *		either PUT_UPDATE / PUT_INSERT is accepted
+ *		PUT_UPDATE: overwrite previous value associated to the _key_
+ *		PUT_INSERT: create another entry without overwriting previous value. all values associated to the _key_ can be retrieved through cursor apis
+ *
+ *	@param [in] pio
+ *		PageIO used for modification
+ *
+ *	@return
+ *		page id of the new root (this may/may not be same as _idRoot_)
  */
 page_id_t btree_put(page_id_t idRoot, BufferCRef key, BufferCRef value, put_mode_t mode, page_id_t pgidDep, PageIO* pio);
 
@@ -109,7 +128,7 @@ page_id_t btree_cursor_put(btree_cursor_t* cur, BufferCRef value, PageIO* pio);
 //! delete active record pointed by _cur_
 /*!
  *	@return
- *		<cursor still valid, new btree root node pgid>
+ *		<true if cursor is still valid, new btree root node pgid>
  */
 pair<bool, page_id_t> btree_cursor_del(btree_cursor_t* cur, PageIO* pio);
 bool btree_cursor_next(btree_cursor_t* cur, PageIO* pio, bool bNormalizeOnly = false);

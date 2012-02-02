@@ -6,7 +6,7 @@
 // #define DEBUG_VERBOSE_TPIOPIO
 // #define DEBUG_VERBOSE_RESTORESTATE
 // #define VERBOSE_REBASE
-#define VERBOSE_REFRESH
+// #define VERBOSE_REFRESH
 
 namespace ptnk
 {
@@ -196,6 +196,12 @@ TPIO2TxSession::updateLink(page_id_t pgidOld)
 }
 
 void
+TPIO2TxSession::discardOldPages(page_id_t threshold)
+{
+	PTNK_THROW_LOGIC_ERR("no impl support: discardOldPages can't be done transactionally");
+}
+
+void
 TPIO2TxSession::loadStreak(BufferCRef bufStreak)
 {
 	if(bufStreak.empty()) return;
@@ -207,7 +213,8 @@ TPIO2TxSession::loadStreak(BufferCRef bufStreak)
 TPIO2::TPIO2(shared_ptr<PageIO> backend, ptnk_opts_t opts)
 :	m_backend(backend),
 	m_sync(opts & OAUTOSYNC),
-	m_bDuringRebase(false)
+	m_bDuringRebase(false),
+	m_bDuringRefresh(false)
 {
 	if(m_backend->needInit())
 	{
@@ -730,8 +737,18 @@ TPIO2::refreshOldPages(page_id_t threshold, size_t pgsPerTx)
 	//    rebase need to wait until rOP finishes... BAD!
 	//
 
-	if(m_bDuringRefresh) return; // already during refresh
-	if(! PTNK_CAS(&m_bDuringRefresh, false, true)) return;
+	if(m_bDuringRefresh)
+	{
+		std::cout << "already during refresh" << std::endl;
+		return; 
+	}
+	PTNK_MEMBARRIER_COMPILER;
+	if(! PTNK_CAS(&m_bDuringRefresh, false, true))
+	{
+		std::cout << "already during refresh (CAS failed)" << std::endl;
+		return;
+	}
+	PTNK_MEMBARRIER_COMPILER;
 
 #ifdef VERBOSE_REFRESH
 	std::cout << "refresh start" << std::endl << *this;
