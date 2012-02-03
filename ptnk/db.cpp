@@ -5,7 +5,7 @@
 #include "pageiomem.h"
 #include "partitionedpageio.h"
 #include "btree.h"
-#include "tpio2.h"
+#include "tpio.h"
 #include "overview.h"
 #include "helperthr.h"
 #include "sysutils.h"
@@ -31,7 +31,7 @@ DB::DB(const char* filename, ptnk_opts_t opts, int mode)
 		m_pio.reset(new PageIOMem(filename, opts, mode));
 	}
 
-	m_tpio.reset(new TPIO2(m_pio, opts));
+	m_tpio.reset(new TPIO(m_pio, opts));
 	initCommon();
 }
 
@@ -39,7 +39,7 @@ DB::DB(const shared_ptr<PageIO>& pio, ptnk_opts_t opts)
 {
 	// FIXME: OHELPERTHREAD would be ignored
 	m_pio = pio;
-	m_tpio.reset(new TPIO2(m_pio, opts));
+	m_tpio.reset(new TPIO(m_pio, opts));
 	initCommon();
 }
 
@@ -105,7 +105,7 @@ DB::newTransaction()
 	return tx;
 }
 
-DB::Tx::Tx(DB* db, unique_ptr<TPIO2TxSession> pio)
+DB::Tx::Tx(DB* db, unique_ptr<TPIOTxSession> pio)
 :	m_bCommitted(false),
 	m_db(db),
 	m_pio(move(pio))
@@ -492,7 +492,7 @@ DB::compactFast()
 void
 DB::dump() const
 {
-	unique_ptr<TPIO2TxSession> tx(m_tpio->newTransaction());
+	unique_ptr<TPIOTxSession> tx(m_tpio->newTransaction());
 	OverviewPage(tx->readPage(tx->pgidStartPage())).dump(tx.get());
 }
 
@@ -500,7 +500,7 @@ void
 DB::dumpGraph(FILE* fp) const
 {
 	fprintf(fp, "digraph bptree {\n");
-	unique_ptr<TPIO2TxSession> tx(m_tpio->newTransaction());
+	unique_ptr<TPIOTxSession> tx(m_tpio->newTransaction());
 	OverviewPage(tx->readPage(tx->pgidStartPage())).dumpGraph(fp, tx.get());
 	fprintf(fp, "}\n");
 }
@@ -517,7 +517,7 @@ DB::dumpAll()
 {
 	std::cout << "*** DB full dump ***" << std::endl;
 	{
-		unique_ptr<TPIO2TxSession> tx(m_tpio->newTransaction());
+		unique_ptr<TPIOTxSession> tx(m_tpio->newTransaction());
 		std::cout << "* overview pgid : " << tx->pgidStartPage() << std::endl;
 	}
 

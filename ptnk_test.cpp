@@ -11,7 +11,7 @@
 #include "ptnk/btree.h"
 #include "ptnk/btree_int.h"
 #include "ptnk/overview.h"
-#include "ptnk/tpio2.h"
+#include "ptnk/tpio.h"
 #include "ptnk/sysutils.h"
 
 #include <iostream>
@@ -2849,14 +2849,14 @@ TEST(ptnk, OverviewPage_cache)
 	} \
 	});
 
-TEST(ptnk, TPIO2_basic)
+TEST(ptnk, TPIO_basic)
 {
 	shared_ptr<PageIO> pio(new PageIOMem);
-	TPIO2 tpio(pio);
+	TPIO tpio(pio);
 
 	page_id_t pgid;
 	{
-		unique_ptr<TPIO2TxSession> tx1(tpio.newTransaction());
+		unique_ptr<TPIOTxSession> tx1(tpio.newTransaction());
 		
 		DebugPage pg(tx1->newInitPage<DebugPage>());
 		bool bOvr = false;
@@ -2872,8 +2872,8 @@ TEST(ptnk, TPIO2_basic)
 	}
 
 	{
-		unique_ptr<TPIO2TxSession> tx1(tpio.newTransaction());
-		unique_ptr<TPIO2TxSession> tx2(tpio.newTransaction());
+		unique_ptr<TPIOTxSession> tx1(tpio.newTransaction());
+		unique_ptr<TPIOTxSession> tx2(tpio.newTransaction());
 		
 		DebugPage pg1(tx1->readPage(pgid));
 		ASSERT_EQ('a', pg1.get());
@@ -2906,11 +2906,11 @@ TEST(ptnk, TPIO2_basic)
 TEST(ptnk, TPIO_multiupdate)
 {
 	shared_ptr<PageIO> pio(new PageIOMem);
-	TPIO2 tpio(pio);
+	TPIO tpio(pio);
 
 	page_id_t pgid;
 	{
-		unique_ptr<TPIO2TxSession> tx1(tpio.newTransaction());
+		unique_ptr<TPIOTxSession> tx1(tpio.newTransaction());
 		
 		DebugPage pg(tx1->newInitPage<DebugPage>());
 		bool bOvr = false;
@@ -2926,7 +2926,7 @@ TEST(ptnk, TPIO_multiupdate)
 	}
 
 	{
-		unique_ptr<TPIO2TxSession> tx1(tpio.newTransaction());
+		unique_ptr<TPIOTxSession> tx1(tpio.newTransaction());
 			
 		DebugPage pg1(tx1->readPage(pgid));
 		ASSERT_EQ('a', pg1.get());
@@ -2955,7 +2955,7 @@ TEST(ptnk, TPIO_multiupdate)
 	}
 
 	{
-		unique_ptr<TPIO2TxSession> tx1(tpio.newTransaction());
+		unique_ptr<TPIOTxSession> tx1(tpio.newTransaction());
 		DebugPage pg1(tx1->readPage(pgid));
 		ASSERT_EQ('c', pg1.get()) << "mod not seen from other tx";
 	}
@@ -2964,10 +2964,10 @@ TEST(ptnk, TPIO_multiupdate)
 TEST(ptnk, TPIO_commitfail)
 {
 	shared_ptr<PageIO> pio(new PageIOMem);
-	TPIO2 tpio(pio);
+	TPIO tpio(pio);
 
 	{
-		unique_ptr<TPIO2TxSession> tx1(tpio.newTransaction());
+		unique_ptr<TPIOTxSession> tx1(tpio.newTransaction());
 		
 		for(int i = 0; i < 10; ++ i)
 		{
@@ -2986,8 +2986,8 @@ TEST(ptnk, TPIO_commitfail)
 
 	for(int k = 0; k < 20; ++ k)
 	{
-		unique_ptr<TPIO2TxSession> tx1(tpio.newTransaction());
-		unique_ptr<TPIO2TxSession> tx2(tpio.newTransaction());
+		unique_ptr<TPIOTxSession> tx1(tpio.newTransaction());
+		unique_ptr<TPIOTxSession> tx2(tpio.newTransaction());
 
 		int x[3];
 		for(int j = 0; j < 3; ++ j)
@@ -3052,10 +3052,10 @@ private:
 TEST(ptnk, TPIO_refreshOldPages_basic)
 {
 	shared_ptr<PageIO> pio(new PageIOMem);
-	TPIO2 tpio(pio);
+	TPIO tpio(pio);
 
 	{
-		unique_ptr<TPIO2TxSession> tx1(tpio.newTransaction());
+		unique_ptr<TPIOTxSession> tx1(tpio.newTransaction());
 
 		tx1->setPgidStartPage(genTestBinTree(tx1.get()));
 
@@ -3065,7 +3065,7 @@ TEST(ptnk, TPIO_refreshOldPages_basic)
 	// create 200 dummy pages
 	for(int i = 0; i < 20; ++ i)
 	{
-		unique_ptr<TPIO2TxSession> txUmeUme(tpio.newTransaction());
+		unique_ptr<TPIOTxSession> txUmeUme(tpio.newTransaction());
 		
 		for(int j = 0; j < 10; ++ j)
 		{
@@ -3079,7 +3079,7 @@ TEST(ptnk, TPIO_refreshOldPages_basic)
 	tpio.refreshOldPages(200);
 
 	{
-		unique_ptr<TPIO2TxSession> tx1(tpio.newTransaction());
+		unique_ptr<TPIOTxSession> tx1(tpio.newTransaction());
 
 		EXPECT_LT(5, tx1->pgidStartPage());
 		
@@ -3091,7 +3091,7 @@ TEST(ptnk, TPIO_refreshOldPages_basic)
 	pio->discardOldPages(200);
 
 	{
-		unique_ptr<TPIO2TxSession> tx1(tpio.newTransaction());
+		unique_ptr<TPIOTxSession> tx1(tpio.newTransaction());
 
 		EXPECT_LT(5, tx1->pgidStartPage());
 		
@@ -3104,10 +3104,10 @@ TEST(ptnk, TPIO_refreshOldPages_basic)
 TEST(ptnk, TPIO_refreshOldPages_btree_single)
 {
 	shared_ptr<PageIO> pio(new PageIOMem);
-	TPIO2 tpio(pio);
+	TPIO tpio(pio);
 
 	{
-		unique_ptr<TPIO2TxSession> tx(tpio.newTransaction());	
+		unique_ptr<TPIOTxSession> tx(tpio.newTransaction());	
 		tx->setPgidStartPage(btree_init(tx.get()));
 		tx->setPgidStartPage(btree_put(tx->pgidStartPage(), cstr2ref("key"), cstr2ref("value"), PUT_INSERT, tx.get()));
 
@@ -3117,7 +3117,7 @@ TEST(ptnk, TPIO_refreshOldPages_btree_single)
 	// create 200 dummy pages
 	for(int i = 0; i < 20; ++ i)
 	{
-		unique_ptr<TPIO2TxSession> txUmeUme(tpio.newTransaction());
+		unique_ptr<TPIOTxSession> txUmeUme(tpio.newTransaction());
 		
 		for(int j = 0; j < 10; ++ j)
 		{
@@ -3132,7 +3132,7 @@ TEST(ptnk, TPIO_refreshOldPages_btree_single)
 	pio->discardOldPages(200);
 
 	{
-		unique_ptr<TPIO2TxSession> tx1(tpio.newTransaction());
+		unique_ptr<TPIOTxSession> tx1(tpio.newTransaction());
 		EXPECT_LT(10, tx1->pgidStartPage());
 
 		CheckOldPgAccess c(tx1.get(), 10);
@@ -3146,10 +3146,10 @@ TEST(ptnk, TPIO_refreshOldPages_btree_single)
 TEST(ptnk, TPIO_refreshOldPages_btree_1000)
 {
 	shared_ptr<PageIO> pio(new PageIOMem);
-	TPIO2 tpio(pio);
+	TPIO tpio(pio);
 
 	{
-		unique_ptr<TPIO2TxSession> tx(tpio.newTransaction());	
+		unique_ptr<TPIOTxSession> tx(tpio.newTransaction());	
 		tx->setPgidStartPage(btree_init(tx.get()));
 		tx->setPgidStartPage(btree_put(tx->pgidStartPage(), cstr2ref("key"), cstr2ref("value"), PUT_INSERT, tx.get()));
 
@@ -3158,7 +3158,7 @@ TEST(ptnk, TPIO_refreshOldPages_btree_1000)
 
 	for(int j = 0; j < 10; ++ j)
 	{
-		unique_ptr<TPIO2TxSession> tx(tpio.newTransaction());	
+		unique_ptr<TPIOTxSession> tx(tpio.newTransaction());	
 
 		for(int i = 0; i < 100; ++ i)
 		{
@@ -3176,7 +3176,7 @@ TEST(ptnk, TPIO_refreshOldPages_btree_1000)
 	// create 200 dummy pages
 	for(int i = 0; i < 20; ++ i)
 	{
-		unique_ptr<TPIO2TxSession> txUmeUme(tpio.newTransaction());
+		unique_ptr<TPIOTxSession> txUmeUme(tpio.newTransaction());
 		
 		for(int j = 0; j < 10; ++ j)
 		{
@@ -3191,7 +3191,7 @@ TEST(ptnk, TPIO_refreshOldPages_btree_1000)
 	pio->discardOldPages(200);
 
 	{
-		unique_ptr<TPIO2TxSession> tx1(tpio.newTransaction());
+		unique_ptr<TPIOTxSession> tx1(tpio.newTransaction());
 		EXPECT_LT(30, tx1->pgidStartPage());
 
 		CheckOldPgAccess c(tx1.get(), 30);

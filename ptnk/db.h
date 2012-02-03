@@ -10,8 +10,8 @@ namespace ptnk
 
 class TPIO;
 class TPIOTxSession;
-class TPIO2;
-class TPIO2TxSession;
+class TPIO;
+class TPIOTxSession;
 
 class PageIO;
 class Helper;
@@ -129,13 +129,13 @@ public:
 
 		void dumpStat() const;
 
-		TPIO2TxSession* pio()
+		TPIOTxSession* pio()
 		{
 			return m_pio.get();	
 		}
 
 	private:
-		Tx(DB* db, unique_ptr<TPIO2TxSession> pio);
+		Tx(DB* db, unique_ptr<TPIOTxSession> pio);
 
 		cursor_t* curNew(BufferCRef table);
 		cursor_t* curNew(TableOffCache* table);
@@ -143,7 +143,7 @@ public:
 		bool m_bCommitted;
 
 		DB* m_db;
-		unique_ptr<TPIO2TxSession> m_pio;
+		unique_ptr<TPIOTxSession> m_pio;
 
 		friend class DB;
 	};
@@ -163,14 +163,14 @@ public:
 
 	void dumpAll();
 
-	TPIO2* tpio_()
+	TPIO* tpio_()
 	{
 		return m_tpio.get();
 	}
 
 private:
 	shared_ptr<PageIO> m_pio;
-	unique_ptr<TPIO2> m_tpio;
+	unique_ptr<TPIO> m_tpio;
 
 	unique_ptr<Helper> m_helper;
 };

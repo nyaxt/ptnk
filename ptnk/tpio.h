@@ -1,5 +1,5 @@
-#ifndef _ptnk_tpio2_h_
-#define _ptnk_tpio2_h_
+#ifndef _ptnk_tpio_h_
+#define _ptnk_tpio_h_
 
 #include "pageio.h"
 #include "stm.h"
@@ -45,12 +45,12 @@ inline
 std::ostream& operator<<(std::ostream& s, const TPIOStat& o)
 { o.dump(s); return s; }
 
-class TPIO2;
+class TPIO;
 
-class TPIO2TxSession : public PageIO
+class TPIOTxSession : public PageIO
 {
 public:
-	~TPIO2TxSession();
+	~TPIOTxSession();
 
 	void dump(std::ostream& s) const;
 
@@ -90,8 +90,8 @@ public:
 	}
 
 protected:
-	friend class TPIO2; // give access to c-tor
-	TPIO2TxSession(TPIO2* tpio, shared_ptr<ActiveOvr> aovr, unique_ptr<LocalOvr> lovr);
+	friend class TPIO; // give access to c-tor
+	TPIOTxSession(TPIO* tpio, shared_ptr<ActiveOvr> aovr, unique_ptr<LocalOvr> lovr);
 
 	PageIO* backend() const;
 
@@ -115,7 +115,7 @@ protected:
 	};
 
 private:
-	TPIO2* m_tpio;
+	TPIO* m_tpio;
 	shared_ptr<ActiveOvr> m_aovr;
 	unique_ptr<LocalOvr> m_lovr;
 	PagesOldLink* m_oldlink;
@@ -123,24 +123,24 @@ private:
 	TPIOStat m_stat;
 };
 inline
-std::ostream& operator<<(std::ostream& s, const TPIO2TxSession& o)
+std::ostream& operator<<(std::ostream& s, const TPIOTxSession& o)
 { o.dump(s); return s; }
 
 constexpr unsigned int REBASE_THRESHOLD = TPIO_NHASH * 8;
 constexpr size_t REFRESH_PGS_PER_TX_DEFAULT = 128;
 
-class TPIO2
+class TPIO
 {
 public:
-	TPIO2(shared_ptr<PageIO> backend, ptnk_opts_t opts = OAUTOSYNC);
+	TPIO(shared_ptr<PageIO> backend, ptnk_opts_t opts = OAUTOSYNC);
 
-	~TPIO2();
+	~TPIO();
 
 	void dump(std::ostream& s) const;
 
-	unique_ptr<TPIO2TxSession> newTransaction();
+	unique_ptr<TPIOTxSession> newTransaction();
 
-	bool tryCommit(TPIO2TxSession* tx, commit_flags_t flags = COMMIT_DEFAULT);
+	bool tryCommit(TPIOTxSession* tx, commit_flags_t flags = COMMIT_DEFAULT);
 
 	void rebase(bool force);
 	void refreshOldPages(page_id_t threshold, size_t pgsPerTx = REFRESH_PGS_PER_TX_DEFAULT);
@@ -156,11 +156,11 @@ public:
 	}
 
 private:
-	class RebaseTPIO2TxSession : public TPIO2TxSession
+	class RebaseTPIOTxSession : public TPIOTxSession
 	{
 	public:
-		RebaseTPIO2TxSession(TPIO2* tpio, shared_ptr<ActiveOvr> aovr, unique_ptr<LocalOvr> lovr, PagesOldLink* oldlink);
-		~RebaseTPIO2TxSession();
+		RebaseTPIOTxSession(TPIO* tpio, shared_ptr<ActiveOvr> aovr, unique_ptr<LocalOvr> lovr, PagesOldLink* oldlink);
+		~RebaseTPIOTxSession();
 
 		page_id_t updateLink(page_id_t idOld);
 		page_id_t rebaseForceVisit(page_id_t pgid);
@@ -173,7 +173,7 @@ private:
 	};
 
 	void syncDelayed(const Vpage_id_t& pagesModified);
-	void commitTxPages(TPIO2TxSession* tx, ver_t verW, bool isRebase);
+	void commitTxPages(TPIOTxSession* tx, ver_t verW, bool isRebase);
 
 	void restoreState();
 
@@ -195,23 +195,23 @@ private:
 	std::condition_variable m_condRebase;
 };
 inline
-std::ostream& operator<<(std::ostream& s, const TPIO2& o)
+std::ostream& operator<<(std::ostream& s, const TPIO& o)
 { o.dump(s); return s; }
 
 inline
 bool
-TPIO2TxSession::tryCommit()
+TPIOTxSession::tryCommit()
 {
 	return m_tpio->tryCommit(this);	
 }
 
 inline
 PageIO*
-TPIO2TxSession::backend() const
+TPIOTxSession::backend() const
 {
 	return m_tpio->backend();
 }
 
 } // end of namespace ptnk
 
-#endif // _ptnk_tpio2_h_
+#endif // _ptnk_tpio_h_
