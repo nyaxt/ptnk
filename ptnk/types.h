@@ -33,6 +33,10 @@ typedef uint16_t part_id_t;
 #define PTNK_PARTID_MAX 4094
 #define PTNK_PARTID_INVALID ((part_id_t)~0)
 
+#define PARTID_NEXT(partid) (((partid) + 1) & 0xfff)
+#define PARTID_PREV(partid) (((partid) - 1) & 0xfff)
+// #define PARTID_LT(a, b) 
+
 //! transaction ID number
 /*!
  *	transaction unique identifier.

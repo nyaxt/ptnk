@@ -4,3 +4,5 @@ build/
 .waf*
 graphdump/
 __pycache__
+core
+_testtmp/

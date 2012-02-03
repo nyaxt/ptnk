@@ -152,7 +152,7 @@ public:
 
 	void rebase(bool force = true);
 	void newPart(bool doRebase = true);
-	void compact();
+	void compactFast();
 
 	// ====== inspectors ======
 	

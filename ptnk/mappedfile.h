@@ -16,8 +16,8 @@ namespace ptnk
 constexpr size_t NUM_PAGES_ALLOC_ONCE = 256;
 
 constexpr unsigned long PARTSIZEFILE_MAX = 1024 * 1024 * 1024; // 1GB
-constexpr unsigned long PARTSIZEFILE_MIN = 128 * 1024 * 1024; // 128MB
-constexpr unsigned long PARTSIZEFILE_PREALLOC_THRESHOLD = 64 * 1024 * 1024; // 64MB  FIXME!
+constexpr unsigned long PARTSIZEFILE_MIN = 16 * 1024 * 1024; // 16MB
+constexpr unsigned long PARTSIZEFILE_PREALLOC_THRESHOLD = 8 * 1024 * 1024; // 8MB
 constexpr unsigned long PARTSIZEFILE_PREALLOC = PARTSIZEFILE_PREALLOC_THRESHOLD * 1.5;
 
 constexpr long NPAGES_PARTMAX = PARTSIZEFILE_MAX/PTNK_PAGE_SIZE;

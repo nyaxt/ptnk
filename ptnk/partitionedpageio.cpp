@@ -27,13 +27,13 @@ PartitionedPageIO::PartitionedPageIO(const char* dbprefix, ptnk_opts_t opts, int
 	PTNK_ASSERT(!strempty(dbprefix) && (opts & OPARTITIONED));
 
 	m_dbprefix = dbprefix;
-	MappedFile* latest = openFiles();
+	bool foundExisting = openFiles();
 
 	if(!(opts & OWRITER))
 	{
 		// read only access
 
-		if(! latest)
+		if(! foundExisting)
 		{
 			PTNK_THROW_RUNTIME_ERR("no existing dbpart file found");
 		}
@@ -42,7 +42,7 @@ PartitionedPageIO::PartitionedPageIO(const char* dbprefix, ptnk_opts_t opts, int
 	{
 		// read/write access
 
-		if(! latest)
+		if(! foundExisting)
 		{
 			if(!(opts & OCREATE))
 			{
@@ -55,7 +55,7 @@ PartitionedPageIO::PartitionedPageIO(const char* dbprefix, ptnk_opts_t opts, int
 		}
 		else
 		{
-			scanLastPgId(latest->partid()); // set m_pgidLast to correct value
+			scanLastPgId(); // set m_pgidLast to correct value
 			m_needInit = false;	
 		}
 	}
@@ -166,10 +166,10 @@ PartitionedPageIO::scanFiles(Vpartfile_t* files, const char* dbprefix)
 	::closedir(dir);
 }
 
-MappedFile*
+bool
 PartitionedPageIO::openFiles()
 {
-	MappedFile* active = nullptr;
+	bool foundExisting = false;
 
 	Vpartfile_t files; scanFiles(&files, m_dbprefix.c_str());
 
@@ -199,27 +199,22 @@ PartitionedPageIO::openFiles()
 				optsPIO &= ~(ptnk_opts_t)OWRITER;
 			}
 
-			MappedFile* p;
-			m_parts[partid].reset(p = MappedFile::openExisting(partid, filepath, optsPIO));
+			m_parts[partid].reset(MappedFile::openExisting(partid, filepath, optsPIO));
 
-			// if the part file is writable and is the newest partition, set the partition active
-			if((optsPIO & OWRITER) && m_partidLast == p->partid())
-			{
-				active = p;
-			}
+			foundExisting = true;
 		}
 	}
 
-	return active;
+	return foundExisting;
 }
 
 void
-PartitionedPageIO::scanLastPgId(part_id_t partidLatest)
+PartitionedPageIO::scanLastPgId()
 {
 	// find last committed pg
 	
 	// FIXME: partid wrap around not considered!!!
-	for(part_id_t partid = partidLatest; partid != PTNK_PARTID_INVALID; -- partid) 
+	for(part_id_t partid = m_partidLast; partid != PTNK_PARTID_INVALID; -- partid) 
 	{
 		std::cout << "scan partid: " << std::hex << partid << std::endl;
 
@@ -459,7 +454,12 @@ void
 PartitionedPageIO::newPart(bool bForce)
 {
 	// is new part. really needed?
-	if(! bForce && m_parts[m_partidLast]->numPagesReserved() < PARTSIZEFILE_MIN/PTNK_PAGE_SIZE) return;	
+	if(! bForce && m_parts[m_partidLast]->numPagesReserved() < PARTSIZEFILE_MIN/PTNK_PAGE_SIZE)
+	{
+		std::cout << "PartitionedPageIO::newPart: force option not specified and partsize " << m_parts[m_partidLast]->numPagesReserved() << " < " << PARTSIZEFILE_MIN/PTNK_PAGE_SIZE << std::endl;
+		std::cout << "PartitionedPageIO::newPart: curr last pg: " << pgid2str(m_pgidLast) << std::endl;
+		return;	
+	}
 
 	// FIXME: remount old part as read-only
 
@@ -508,12 +508,8 @@ page_id_t
 PartitionedPageIO::alignCompactionThreshold(page_id_t threshold) const
 {
 	part_id_t partid = PGID_PARTID(threshold);
-	if(PGID_LOCALID(threshold) != 0)
-	{
-		-- partid;
-	}
 
-	if(partid < m_partidFirst)
+	if(! m_parts[partid])
 	{
 		return PGID_INVALID;
 	}

@@ -51,6 +51,7 @@ Helper::thrmain()
 			m_jobq.pop();
 		}
 
+		if(m_isCancelled) return;
 		job();
 	}
 }

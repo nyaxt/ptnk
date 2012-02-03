@@ -79,6 +79,12 @@ PageIO::needInit() const
 	return true;
 }
 
+page_id_t
+PageIO::alignCompactionThreshold(page_id_t threshold) const
+{
+	return threshold; // no align
+}
+
 void
 PageIO::dumpStat() const
 {

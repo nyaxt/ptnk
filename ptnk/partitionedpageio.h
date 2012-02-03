@@ -37,8 +37,6 @@ public:
 	//! delete all db files for _dbprefix_
 	static void drop(const char* dbprefix);
 
-	page_id_t alignCompactionThreshold(page_id_t threshold) const;
-
 	// ====== implements PageIO interface ======
 
 	virtual pair<Page, page_id_t> newPage();
@@ -51,6 +49,8 @@ public:
 	virtual local_pgid_t getPartLastLocalPgId(part_id_t ptid) const;
 
 	virtual bool needInit() const;
+
+	page_id_t alignCompactionThreshold(page_id_t threshold) const;
 
 	virtual void newPart(bool bForce = false);
 	virtual void discardOldPages(page_id_t threshold);
@@ -65,9 +65,9 @@ private:
 	//! open partitioned db files and populate m_parts
 	/*!
 	 *	@return
-	 *		MappedFile instance carrying latest partition file
+	 *		true if usable existing db file was found
 	 */
-	MappedFile* openFiles();
+	bool openFiles();
 
 	//! add new partition
 	/*!
@@ -75,7 +75,7 @@ private:
 	 */
 	void addNewPartition_unsafe();
 
-	void scanLastPgId(part_id_t partidLatest); // FIXME: why partidLatest is needed???
+	void scanLastPgId();
 
 	//! alloc more pages
 	void expandTo(page_id_t pgid);

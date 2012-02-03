@@ -114,6 +114,13 @@ public:
 	 */
 	virtual bool needInit() const;
 
+	//! align compaction threshold
+	/*!
+	 *	Some PageIO impls (like PartitionedPageIO) have a recommended breaks.
+	 *	This method can be used to align threshold to those.
+	 */
+	virtual page_id_t alignCompactionThreshold(page_id_t threshold) const;
+
 	//! explicitly make new partition
 	virtual void newPart(bool bForce = true);
 

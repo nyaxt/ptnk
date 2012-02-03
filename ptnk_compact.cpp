@@ -16,7 +16,7 @@ main(int argc, char* argv[])
 	try
 	{
 		ptnk::DB db(argv[1], OWRITER | OPARTITIONED);
-		db.compact();
+		db.compactFast();
 	}
 	catch(std::exception& e)
 	{

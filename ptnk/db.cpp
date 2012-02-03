@@ -465,24 +465,15 @@ DB::newPart(bool doRebase)
 }
 
 void
-DB::compact()
+DB::compactFast()
 {
-	m_pio->newPart(false /* no force */);
-
-	PartitionedPageIO* ppio = dynamic_cast<PartitionedPageIO*>(m_pio.get());
-	if(! ppio)
-	{
-		std::cerr << "ptnk::DB::compact called on unsupported PageIO impl." << std::endl;
-		return;	
-	}
-
-	std::cout << "* starting compaction." << std::endl;
+	std::cout << "* starting compaction (fast mode)." << std::endl;
 
 	std::cout << "lastpgid: " << pgid2str(m_pio->getLastPgId()) << std::endl;
 	std::cout << "numuniqpgs: " << m_tpio->stat().nUniquePages << std::endl;
 	page_id_t threshold = m_pio->getLastPgId() - m_tpio->stat().nUniquePages * 3;
 	std::cout << "orig threshold : " << pgid2str(threshold) << std::endl;
-	threshold = ppio->alignCompactionThreshold(threshold);
+	threshold = m_pio->alignCompactionThreshold(threshold);
 	std::cout << "aligned threshold : " << pgid2str(threshold) << std::endl;
 
 	if(threshold == PGID_INVALID)

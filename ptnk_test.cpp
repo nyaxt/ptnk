@@ -4250,6 +4250,46 @@ TEST(ptnk, multithread_put)
 	if(fplist) fclose(fplist);
 }
 
+TEST(ptnk, db_compactFast)
+{
+	t_mktmpdir("./_testtmp");
+
+	{
+		DB db("./_testtmp/comp", OWRITER | OCREATE | OTRUNCATE | OPARTITIONED);
+
+		db.put(cstr2ref("key"), cstr2ref("value"));
+
+		Buffer v;
+		db.get(cstr2ref("key"), &v);
+		v.makeNullTerm();
+		EXPECT_STREQ("value", v.get());
+
+		for(int j = 0; j < 5; ++ j)
+		{
+			db.newPart();
+			for(int i = 0; i < 1000; ++ i)
+			{
+				db.put(cstr2ref("hogehoge"), cstr2ref("fugafuga"));
+			}
+		}
+		
+		db.compactFast();
+
+		db.get(cstr2ref("key"), &v);
+		v.makeNullTerm();
+		EXPECT_STREQ("value", v.get());
+	}
+
+	{
+		DB db("./_testtmp/comp", OPARTITIONED);
+
+		Buffer v;
+		db.get(cstr2ref("key"), &v);
+		v.makeNullTerm();
+		EXPECT_STREQ("value", v.get());
+	}
+}
+
 TEST(ptnk, ndbm_api)
 {
 	t_mktmpdir("./_testtmp");
