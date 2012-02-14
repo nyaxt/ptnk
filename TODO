@@ -35,6 +35,7 @@ ptnk known issues list:
 
 VERY CRITICAL
 - DupKey-tree compaction is not implemented! (may result in record-loss)
+- Read set
 
 CRITICAL
 - version number may exceed 64-bit

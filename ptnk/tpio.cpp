@@ -645,7 +645,7 @@ TPIO::rebase(bool force)
 	STAGEPROF_STAGE(0x0000FF);
 
 	// 1. refuse further tx to commit
-	m_aovr->terminate();
+	m_aovr->terminate(); // put terminator to lovr linked-list and do merge
 	
 	// 2. ready list of pages old link
 	PagesOldLink pol;
@@ -685,11 +685,8 @@ TPIO::rebase(bool force)
 #ifdef VERBOSE_REBASE
 	std::cerr << *tx << std::endl;
 #endif
-
-	// 4. commit rebase tx. pages
-	commitTxPages(tx.get(), verBase, true);
 	
-	// 5. trash old aovr and start accepting new tx
+	// 4. trash old aovr and start accepting new tx
 	m_stat.nOvr = 0; // clear num ovr.
 	// FIXME FIXME: shared_ptr can't be assigned atomically (refcnt / ptr)
 	m_aovr = shared_ptr<ActiveOvr>(new ActiveOvr(tx->pgidStartPage(), verBase));
@@ -698,6 +695,9 @@ TPIO::rebase(bool force)
 
 	m_bDuringRebase = false;
 	m_condRebase.notify_all();
+
+	// 5. commit rebase tx. pages
+	commitTxPages(tx.get(), verBase, true);
 	
 #ifdef VERBOSE_REBASE
 	printf("rebase end verBase: %d\n", m_aovr->verBase());
