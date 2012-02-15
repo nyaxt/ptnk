@@ -102,7 +102,7 @@ protected:
 
 	void addOvr(page_id_t pgidOrig, page_id_t pgidOvr)
 	{
-		m_lovr->addOvr(pgidOrig, pgidOvr);	
+		m_lovr->addOvr(pgidOrig, pgidOvr);
 	}
 
 	void loadStreak(BufferCRef bufStreak);
@@ -121,6 +121,7 @@ private:
 	PagesOldLink* m_oldlink;
 	Vpage_id_t m_pagesModified;
 	TPIOStat m_stat;
+	size_t m_regtxidx;
 };
 inline
 std::ostream& operator<<(std::ostream& s, const TPIOTxSession& o)
@@ -193,6 +194,12 @@ private:
 
 	std::mutex m_mtxRebase;
 	std::condition_variable m_condRebase;
+
+	static const size_t NTXPOOL = 256;
+	TPIOTxSession* m_txpool[NTXPOOL];
+public:
+	void registerTx(TPIOTxSession* tx);
+	void unregisterTx(TPIOTxSession* tx);
 };
 inline
 std::ostream& operator<<(std::ostream& s, const TPIO& o)

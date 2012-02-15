@@ -10,8 +10,6 @@ namespace ptnk
 
 class TPIO;
 class TPIOTxSession;
-class TPIO;
-class TPIOTxSession;
 
 class PageIO;
 class Helper;

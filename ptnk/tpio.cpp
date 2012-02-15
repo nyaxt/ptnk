@@ -48,6 +48,8 @@ TPIOTxSession::TPIOTxSession(TPIO* tpio, shared_ptr<ActiveOvr> aovr, unique_ptr<
 	m_aovr(move(aovr)),
 	m_lovr(move(lovr))
 {
+	tpio->registerTx(this);
+
 	m_lovr->attachExtra(unique_ptr<OvrExtra>(new OvrExtra));
 	m_oldlink = &reinterpret_cast<OvrExtra*>(m_lovr->getExtra())->oldlink;
 }
@@ -66,7 +68,7 @@ TPIOTxSession::OvrExtra::~OvrExtra()
 
 TPIOTxSession::~TPIOTxSession()
 {
-	/* NOP */
+	m_tpio->unregisterTx(this);
 }
 
 pair<Page, page_id_t>
@@ -216,6 +218,11 @@ TPIO::TPIO(shared_ptr<PageIO> backend, ptnk_opts_t opts)
 	m_bDuringRebase(false),
 	m_bDuringRefresh(false)
 {
+	for(size_t i = 0; i < NTXPOOL; ++ i)
+	{
+		m_txpool[i] = nullptr;
+	}
+
 	if(m_backend->needInit())
 	{
 		m_aovr = unique_ptr<ActiveOvr>(new ActiveOvr);
@@ -259,6 +266,34 @@ TPIO::newTransaction()
 	}
 	unique_ptr<LocalOvr> lovr = aovr->newTx();
 	return unique_ptr<TPIOTxSession>(new TPIOTxSession(this, move(aovr), move(lovr)));
+}
+
+void
+TPIO::registerTx(TPIOTxSession* tx)
+{
+#ifdef PTNK_REGTX
+	for(size_t i = 0; i < NTXPOOL; ++ i)
+	{
+		if(!m_txpool[i] && PTNK_CAS(&m_txpool[i], 0, tx))
+		{
+			tx->m_regtxidx = i;
+			return;
+		}
+	}
+
+	PTNK_THROW_RUNTIME_ERR("out of session pool");
+#endif
+}
+
+void
+TPIO::unregisterTx(TPIOTxSession* tx)
+{
+#ifdef PTNK_REGTX
+	size_t i = tx->m_regtxidx;
+
+	PTNK_ASSERT(m_txpool[i] == tx);
+	m_txpool[i] = nullptr;
+#endif
 }
 
 void

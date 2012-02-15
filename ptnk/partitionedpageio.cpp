@@ -20,6 +20,7 @@ namespace ptnk
 
 PartitionedPageIO::PartitionedPageIO(const char* dbprefix, ptnk_opts_t opts, int mode)
 :	m_mode(mode), m_opts(opts),
+	m_needInit(false),
     m_pgidLast(PGID_INVALID),
 	m_partidFirst(PTNK_PARTID_INVALID), m_partidLast(0),
 	m_helper(nullptr), m_isHelperInvoked(true)
