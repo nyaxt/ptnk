@@ -121,17 +121,17 @@ op = OptionParser.new
 
 $PROGBASEDIR = File.expand_path("..", File.dirname(__FILE__))
 $MINREPEAT = 3
-$HGREV=`hg id -n`.chomp
+$REV=`git show -s --pretty=%h`.chomp
 
-op.on('--force-prog PROG') {|v| $FORCE_PROG = v; $HGREV = '@'+File.basename(v).gsub('_bench', '') }
+op.on('--force-prog PROG') {|v| $FORCE_PROG = v; $REV = '@'+File.basename(v).gsub('_bench', '') }
 op.on('-n MINREPEAT_NUM') {|v| $MINREPEAT = v.to_i }
 op.on('-d') {|v| $DRYRUN = true }
-op.on('-i REVSTRDESC') {|v| $HGREV += v }
-op.on('-f') {|v| $HGREV =~ /^(\d+)/; $HGREV = $1}
+op.on('-i REVSTRDESC') {|v| $REV += v }
+op.on('-f') {|v| $REV =~ /^(\d+)/; $REV = $1}
 
 op.parse!(ARGV)
 
-if $HGREV =~ /\+$/
+if $REV =~ /\+$/
   err "need change desc for benchmarking on uncommitted rev (-i desc)"
   exit 1
 end
@@ -204,7 +204,7 @@ begin
   msg "going to run benchs:\n#{benchs.map {|b| "- #{b.name}\n"}.join}"
   
   resputs "### bench session start #{Time.now.strftime("%D %T")}"
-  resputs "HGREV #{$HGREV}"
+  resputs "REV #{$REV}"
   benchs.each do |bench|
     bench.run
 

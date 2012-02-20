@@ -271,7 +271,6 @@ TPIO::newTransaction()
 void
 TPIO::registerTx(TPIOTxSession* tx)
 {
-#ifdef PTNK_REGTX
 	for(size_t i = 0; i < NTXPOOL; ++ i)
 	{
 		if(!m_txpool[i] && PTNK_CAS(&m_txpool[i], 0, tx))
@@ -282,18 +281,15 @@ TPIO::registerTx(TPIOTxSession* tx)
 	}
 
 	PTNK_THROW_RUNTIME_ERR("out of session pool");
-#endif
 }
 
 void
 TPIO::unregisterTx(TPIOTxSession* tx)
 {
-#ifdef PTNK_REGTX
 	size_t i = tx->m_regtxidx;
 
 	PTNK_ASSERT(m_txpool[i] == tx);
 	m_txpool[i] = nullptr;
-#endif
 }
 
 void

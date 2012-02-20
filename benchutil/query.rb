@@ -1,4 +1,4 @@
-#!/usr/bin/ruby1.9.1
+#!/usr/bin/ruby
 
 require 'pp'
 require 'tmpdir'
@@ -13,11 +13,11 @@ def parse(host)
   curr_bench = nil
   File.open("benchresult.#{host}", 'r').each_line do |line|
     case line
-    when /^HGREV\s+(.*)$/
-      hgrev = $1
-      curr_bench = benches.find{|b| b[:hgrev] == hgrev}
+    when /^REV\s+(.*)$/
+      rev = $1
+      curr_bench = benches.find{|b| b[:rev] == rev}
       unless curr_bench
-        curr_bench = {:hgrev => hgrev, :data => Hash.new {|h,k| h[k] = []}}
+        curr_bench = {:rev => rev, :data => Hash.new {|h,k| h[k] = []}}
         benches << curr_bench
       end
     when /^RESULT\s+([\w\:]+)\s+([\d\.]+)\s+(.*)$/
@@ -50,7 +50,7 @@ def separate_special(benches)
   specials = []
   
   benches.keep_if do |b|
-    if b[:hgrev] =~ /^@/
+    if b[:rev] =~ /^@/
       specials << b
       false
     else
@@ -101,12 +101,12 @@ def format_table(benches, types, opts)
 
   alt = false
   benches.each do |bench|
-    if (not sepline_done) and bench[:hgrev] =~ /^@/
+    if (not sepline_done) and bench[:rev] =~ /^@/
       puts ('-'*80).foreground(:blue)
       sepline_done = true
     end
 
-    line = "#{bench[:hgrev][0,15].ljust(15)} :"+types.map {|t|
+    line = "#{bench[:rev][0,15].ljust(15)} :"+types.map {|t|
       bd = bench[:bestdata][t]
 
       unless bd
@@ -140,7 +140,7 @@ def format_plotdata(io, benches, type)
   benches.each do |bench|
     bd = bench[:bestdata][type]
 
-    io.print %Q{"#{bench[:hgrev]}"\t}
+    io.print %Q{"#{bench[:rev]}"\t}
     if bd
       io.puts bd.join("\t")
     else
@@ -264,12 +264,12 @@ benches = limit_num(benches, opts[:limit] || 5)
 
 if opts[:rel_to]
   opts[:percent] = true if opts[:percent].nil?
-  base = (benches + special_benches).find {|b| b[:hgrev] =~ Regexp.new(opts[:rel_to]) }
+  base = (benches + special_benches).find {|b| b[:rev] =~ Regexp.new(opts[:rel_to]) }
   unless base
     puts "E no benchshot matching \"#{opts[:rel_to]}\" found"
     exit 1
   end
-  puts "displaying benchresults relative to \"#{base[:hgrev]}\""
+  puts "displaying benchresults relative to \"#{base[:rev]}\""
   make_rel(base, (benches + special_benches))
 end
 
