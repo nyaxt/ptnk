@@ -3211,6 +3211,48 @@ TEST(ptnk, TPIO_refreshOldPages_btree_1000)
 	}
 }
 
+TEST(ptnk, TPIO_join)
+{
+	shared_ptr<PageIO> pio(new PageIOMem);
+	TPIO tpio(pio);
+
+	tpio.join(); // => should not pause
+
+	{
+		unique_ptr<TPIOTxSession> tx1(tpio.newTransaction());
+		unique_ptr<TPIOTxSession> tx2(tpio.newTransaction());
+	}
+
+	tpio.join(); // => should not pause
+
+	unique_ptr<std::thread> t;
+	int a = 0;
+	{
+		unique_ptr<TPIOTxSession> tx1(tpio.newTransaction());
+		a = 1;
+
+		usleep(10000);
+
+		t.reset(new std::thread([&tpio, &a] () mutable {
+			tpio.join();
+
+			EXPECT_LE(2, a);
+			// std::cout << "a: " << a << std::endl;
+		}));
+
+		usleep(10000);
+
+		a = 2;
+	}
+
+	for(int a = 2; a < 100; ++ a)
+	{
+		unique_ptr<TPIOTxSession> tx(tpio.newTransaction());
+	}
+
+	t->join();
+}
+
 TEST(ptnk, nUniquePages)
 {
 	DB db;
