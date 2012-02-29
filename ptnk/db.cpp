@@ -484,6 +484,9 @@ DB::compactFast()
 
 	m_tpio->refreshOldPages(threshold);
 	std::cout << "refreshOldPages done." << std::endl;
+
+	// wait for end of txs started before refresh old pages
+	m_tpio->join();
 	
 	m_pio->discardOldPages(threshold);
 	std::cout << "discardOldPages done." << std::endl;

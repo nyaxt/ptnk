@@ -212,17 +212,116 @@ TPIOTxSession::loadStreak(BufferCRef bufStreak)
 	oldlink()->restore(bufStreak);
 }
 
+//! keep track of active TPIOTxSessions
+/*!
+ *	All active txs (which may issue page read) are registered to this pool.
+ *	This can be used to ensure that all txs have started after certain point of time.
+ *  This is currently used in discarding pages.
+ */
+class TPIO::TxPool
+{
+public:
+	TxPool();
+
+	void registerTx(TPIOTxSession* tx);
+	void unregisterTx(TPIOTxSession* tx);
+	
+	void join();
+
+private:
+	static constexpr uintptr_t ABACOUNTER_MASK	= 0xffff000000000000ULL;
+	static constexpr uintptr_t PTR_MASK			= 0x0000ffffffffffffULL;
+	static constexpr uintptr_t ABACOUNTER_SHIFT = 48;
+	static constexpr size_t NTXPOOL = 256;
+	
+	uintptr_t m_txpool[NTXPOOL];
+};
+
+TPIO::TxPool::TxPool()
+{
+	::memset(m_txpool, 0, sizeof m_txpool); 
+}
+
+void
+TPIO::TxPool::registerTx(TPIOTxSession* tx)
+{
+	PTNK_ASSERT((reinterpret_cast<uintptr_t>(tx) & ABACOUNTER_MASK) == 0);
+
+	for(size_t i = 0; i < NTXPOOL; ++ i)
+	{
+		uintptr_t o = m_txpool[i];
+		PTNK_MEMBARRIER_COMPILER;
+		uintptr_t c = (o & ABACOUNTER_MASK) >> ABACOUNTER_SHIFT;
+		uintptr_t p = o & PTR_MASK;
+
+		uintptr_t r = ((c+1) << ABACOUNTER_SHIFT) | reinterpret_cast<uintptr_t>(tx);
+
+		if(!p && PTNK_CAS(&m_txpool[i], o, r))
+		{
+			tx->embedRegIdx(i);
+			return;
+		}
+	}
+
+	PTNK_THROW_RUNTIME_ERR("out of session pool");
+}
+
+void
+TPIO::TxPool::unregisterTx(TPIOTxSession* tx)
+{
+	size_t i = tx->regIdx();
+
+	PTNK_ASSERT(reinterpret_cast<uintptr_t>(tx) == (m_txpool[i] & PTR_MASK));
+	m_txpool[i] &= ABACOUNTER_MASK; // clear ptr part
+}
+
+void
+TPIO::TxPool::join()
+{
+	// take pool snapshot
+	uintptr_t poolss[NTXPOOL];
+	for(size_t i = 0; i < NTXPOOL; ++ i)
+	{
+		poolss[i] = m_txpool[i];
+	}
+
+	for(;;)
+	{
+	NOTREADY:;
+		// FIXME: revert to cond wait after certain period of time
+		usleep(1);
+		for(size_t i = 0; i < NTXPOOL; ++ i)
+		{
+			uintptr_t ss = poolss[i];
+			if(ss & PTR_MASK)
+			{
+				uintptr_t curr = m_txpool[i];
+				if(ss != curr)
+				{
+					// tx in slot i has changed...
+
+					// skip check in next iter.
+					poolss[i] = 0;	
+				}
+				else
+				{
+					// tx in slot i has not changed
+					goto NOTREADY;
+				}
+			}
+		}
+
+		return;	
+	}
+}
+
 TPIO::TPIO(shared_ptr<PageIO> backend, ptnk_opts_t opts)
 :	m_backend(backend),
 	m_sync(opts & OAUTOSYNC),
 	m_bDuringRebase(false),
-	m_bDuringRefresh(false)
+	m_bDuringRefresh(false),
+	m_txpool(new TxPool)
 {
-	for(size_t i = 0; i < NTXPOOL; ++ i)
-	{
-		m_txpool[i] = nullptr;
-	}
-
 	if(m_backend->needInit())
 	{
 		m_aovr = unique_ptr<ActiveOvr>(new ActiveOvr);
@@ -268,28 +367,18 @@ TPIO::newTransaction()
 	return unique_ptr<TPIOTxSession>(new TPIOTxSession(this, move(aovr), move(lovr)));
 }
 
+inline
 void
 TPIO::registerTx(TPIOTxSession* tx)
 {
-	for(size_t i = 0; i < NTXPOOL; ++ i)
-	{
-		if(!m_txpool[i] && PTNK_CAS(&m_txpool[i], 0, tx))
-		{
-			tx->m_regtxidx = i;
-			return;
-		}
-	}
-
-	PTNK_THROW_RUNTIME_ERR("out of session pool");
+	m_txpool->registerTx(tx);
 }
 
+inline
 void
 TPIO::unregisterTx(TPIOTxSession* tx)
 {
-	size_t i = tx->m_regtxidx;
-
-	PTNK_ASSERT(m_txpool[i] == tx);
-	m_txpool[i] = nullptr;
+	m_txpool->unregisterTx(tx);
 }
 
 void
@@ -809,6 +898,12 @@ TPIO::refreshOldPages(page_id_t threshold, size_t pgsPerTx)
 #endif
 
 	rebase(/* force = */ true);
+}
+
+void
+TPIO::join()
+{
+	m_txpool->join();
 }
 
 void

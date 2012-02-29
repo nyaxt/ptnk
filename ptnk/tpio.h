@@ -121,6 +121,20 @@ private:
 	PagesOldLink* m_oldlink;
 	Vpage_id_t m_pagesModified;
 	TPIOStat m_stat;
+
+	// for TPIO::TxPool
+public:
+	void embedRegIdx(size_t regtxidx)
+	{
+		m_regtxidx = regtxidx;	
+	}
+
+	size_t regIdx() const
+	{
+		return m_regtxidx;	
+	}
+
+private:
 	size_t m_regtxidx;
 };
 inline
@@ -145,6 +159,7 @@ public:
 
 	void rebase(bool force);
 	void refreshOldPages(page_id_t threshold, size_t pgsPerTx = REFRESH_PGS_PER_TX_DEFAULT);
+	void join();
 
 	PageIO* backend()
 	{
@@ -195,8 +210,8 @@ private:
 	std::mutex m_mtxRebase;
 	std::condition_variable m_condRebase;
 
-	static const size_t NTXPOOL = 256;
-	TPIOTxSession* m_txpool[NTXPOOL];
+	class TxPool;
+	unique_ptr<TxPool> m_txpool;
 public:
 	void registerTx(TPIOTxSession* tx);
 	void unregisterTx(TPIOTxSession* tx);
