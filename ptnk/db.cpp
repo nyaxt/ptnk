@@ -25,6 +25,9 @@ DB::DB(const char* filename, ptnk_opts_t opts, int mode)
 		PartitionedPageIO* ppio;
 		m_pio.reset((ppio = new PartitionedPageIO(filename, opts, mode)));
 		if(m_helper) ppio->attachHelper(m_helper.get());
+		ppio->setHookAddNewPartition([] () {
+			printf("hook !!!\n");	
+		});
 	}
 	else
 	{

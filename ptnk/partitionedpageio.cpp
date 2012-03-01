@@ -264,6 +264,11 @@ PartitionedPageIO::addNewPartition_unsafe()
 	}
 
 	m_parts[partid] = unique_ptr<MappedFile>(MappedFile::createNew(partid, filename, m_opts, m_mode));
+	
+	if(m_hook_addNewPartition)
+	{
+		m_hook_addNewPartition();	
+	}
 }
 
 void

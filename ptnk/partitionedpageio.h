@@ -31,6 +31,13 @@ public:
 
 	void dump(std::ostream& s) const;
 
+	typedef std::function<void ()> hook_t;
+	//! add hook func. to be called when adding new partition
+	void setHookAddNewPartition(const hook_t& h)
+	{
+		m_hook_addNewPartition = h;	
+	}
+
 	//! scan for partitioned db files
 	static void scanFiles(Vpartfile_t* files, const char* dbprefix);
 
@@ -71,7 +78,7 @@ private:
 
 	//! add new partition
 	/*!
-	 *	@caution m_mtxAlloc must be locked whle calling function.
+	 *	@caution m_mtxAlloc must be locked when calling this method.
 	 */
 	void addNewPartition_unsafe();
 
@@ -112,6 +119,9 @@ private:
 	 *	@sa newPage() impl.
 	 */
 	bool m_isHelperInvoked;
+
+	//! hook func to be called when adding new partition
+	hook_t m_hook_addNewPartition;
 };
 inline
 std::ostream& operator<<(std::ostream& s, const PartitionedPageIO& o)
