@@ -64,8 +64,21 @@ public:
 
 	virtual void dumpStat() const;
 
-	// ====== inspection funcs for test ======
+	// ====== inspection funcs ======
 	
+	//! return number of allocated pages
+	size_t numAllocPages() const;
+
+	//! return number of allocated AND written pages
+	/*!
+	 *	this is numAllocPages() - prealloced pages
+	 */
+	size_t numPastPages() const;
+	
+	//! return number of active partitions
+	/*!
+	 * this is currently only used from test. quite slow
+	 */
 	size_t numPartitions_() const;
 
 private:

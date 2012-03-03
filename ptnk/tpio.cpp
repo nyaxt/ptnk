@@ -893,6 +893,9 @@ TPIO::refreshOldPages(page_id_t threshold, size_t pgsPerTx)
 	}
 	while(cursor);
 
+	PTNK_MEMBARRIER_COMPILER;
+	m_bDuringRefresh = false;
+
 #ifdef VERBOSE_REFRESH
 	std::cout << "refresh end" << std::endl << *this;
 #endif

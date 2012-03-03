@@ -167,6 +167,8 @@ public:
 	}
 
 private:
+	void handleHookAddNewPartition();
+
 	shared_ptr<PageIO> m_pio;
 	unique_ptr<TPIO> m_tpio;
 

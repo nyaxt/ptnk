@@ -24,10 +24,15 @@ DB::DB(const char* filename, ptnk_opts_t opts, int mode)
 	{
 		PartitionedPageIO* ppio;
 		m_pio.reset((ppio = new PartitionedPageIO(filename, opts, mode)));
-		if(m_helper) ppio->attachHelper(m_helper.get());
-		ppio->setHookAddNewPartition([] () {
-			printf("hook !!!\n");	
-		});
+		if(m_helper)
+		{
+			ppio->attachHelper(m_helper.get());
+			ppio->setHookAddNewPartition([this] () {
+				m_helper->enq([this] () {
+					this->handleHookAddNewPartition();
+				});
+			});
+		}
 	}
 	else
 	{
@@ -493,6 +498,27 @@ DB::compactFast()
 	
 	m_pio->discardOldPages(threshold);
 	std::cout << "discardOldPages done." << std::endl;
+}
+
+void
+DB::handleHookAddNewPartition()
+{
+	PartitionedPageIO* ppio = dynamic_cast<PartitionedPageIO*>(m_pio.get());
+	size_t nPastPages = ppio->numPastPages();
+	size_t nUniquePages = m_tpio->stat().nUniquePages;
+	std::cout << "nPastPgs: " << nPastPages<< std::endl;
+	std::cout << "nUniquePages: " << nUniquePages << std::endl;
+	size_t nUnusedPages = nPastPages - nUniquePages;
+	std::cout << "nUnusedPages: " << nUnusedPages << std::endl;
+
+	double f = static_cast<double>(nUniquePages) / nPastPages;
+	std::cout << "ratio used: " << f << std::endl;
+
+	if(f < 0.5)
+	{
+		// do compaction
+		compactFast();
+	}
 }
 
 void

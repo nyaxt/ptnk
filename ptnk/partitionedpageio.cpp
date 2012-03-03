@@ -217,7 +217,7 @@ PartitionedPageIO::scanLastPgId()
 	// FIXME: partid wrap around not considered!!!
 	for(part_id_t partid = m_partidLast; partid != PTNK_PARTID_INVALID; -- partid) 
 	{
-		std::cout << "scan partid: " << std::hex << partid << std::endl;
+		std::cout << "scan partid: " << std::hex << partid << std::dec << std::endl;
 
 		MappedFile* part = m_parts[partid].get();
 		PTNK_CHECK(part);
@@ -498,6 +498,46 @@ PartitionedPageIO::dump(std::ostream& s) const
 }
 
 size_t
+PartitionedPageIO::numPastPages() const
+{
+	size_t ret = 0;
+	part_id_t currpartid = PGID_PARTID(m_pgidLast);
+
+	for(auto& part: m_parts)
+	{
+		if(part)
+		{
+			if(part->partid() != currpartid)
+			{
+				ret += part->numPagesReserved();
+			}
+			else
+			{
+				return ret + getPartLastLocalPgId(currpartid);
+			}
+		}
+	}
+
+	PTNK_THROW_RUNTIME_ERR("should not come here!!!");
+}
+
+size_t
+PartitionedPageIO::numAllocPages() const
+{
+	size_t ret = 0;
+	
+	for(auto& part: m_parts)
+	{
+		if(part)
+		{
+			ret += part->numPagesReserved();
+		}
+	}
+
+	return ret;
+}
+
+size_t
 PartitionedPageIO::numPartitions_() const
 {
 	size_t ret = 0;	
@@ -534,12 +574,10 @@ PartitionedPageIO::discardOldPages(page_id_t threshold)
 	// FIXME: won't work if partid wrap around
 	for(part_id_t id = 0; id < partidT; ++ id)
 	{
-		MappedFile* part = m_parts[id].get();
+		unique_ptr<MappedFile> part = move(m_parts[id]);
 		if(! part) continue;
 
 		part->discardFile();
-		
-		m_parts[id].reset();
 	}
 }
 
